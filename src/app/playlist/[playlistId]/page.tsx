@@ -21,7 +21,7 @@ export default async function PlaylistDetailPage({
 
   const playlist = await db.query.playlists.findFirst({
     where: eq(playlists.id, playlistId),
-    with: { owner: true },
+    with: { owner: true, circle: true },
   });
   if (!playlist) notFound();
 
@@ -38,7 +38,7 @@ export default async function PlaylistDetailPage({
         currentUserId={user.id}
         spotifyPlaylistId={playlist.spotifyPlaylistId}
         vibeName={playlist.vibeName}
-        ownerSpotifyClientId={playlist.owner.spotifyClientId ?? undefined}
+        circleSpotifyClientId={playlist.circle.spotifyClientId}
       />
     </Suspense>
   );

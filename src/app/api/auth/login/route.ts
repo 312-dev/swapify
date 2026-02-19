@@ -24,6 +24,12 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 export async function GET(request: NextRequest) {
   const returnTo = request.nextUrl.searchParams.get('returnTo');
   const clientId = request.nextUrl.searchParams.get('clientId') ?? process.env.SPOTIFY_CLIENT_ID;
+  const circleId = request.nextUrl.searchParams.get('circleId');
+  const circleAction = request.nextUrl.searchParams.get('circleAction') as
+    | 'create'
+    | 'join'
+    | 'reauth'
+    | null;
 
   if (!clientId) {
     return NextResponse.redirect(new URL('/login?error=no_client_id', request.url));
@@ -40,6 +46,8 @@ export async function GET(request: NextRequest) {
   session.codeVerifier = codeVerifier;
   session.spotifyClientId = clientId;
   if (returnTo) session.returnTo = returnTo;
+  if (circleId) session.pendingCircleId = circleId;
+  if (circleAction) session.pendingCircleAction = circleAction;
   await session.save();
 
   const scopes = [

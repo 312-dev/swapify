@@ -1,6 +1,6 @@
 import { db } from '@/db';
-import { users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { circleMembers } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { encrypt, decrypt } from '@/lib/crypto';
 import type {
   SpotifyTokenResponse,
@@ -23,6 +23,7 @@ const SPOTIFY_ACCOUNTS = 'https://accounts.spotify.com';
 export class TokenInvalidError extends Error {
   constructor(
     public userId: string,
+    public circleId: string,
     message: string
   ) {
     super(message);
@@ -30,42 +31,48 @@ export class TokenInvalidError extends Error {
   }
 }
 
-// Per-user mutex: dedup concurrent refresh attempts so only one hits Spotify
+// Per-user-per-circle mutex: dedup concurrent refresh attempts so only one hits Spotify
 const inflightRefreshes = new Map<string, Promise<string>>();
 
-export async function refreshAccessToken(userId: string): Promise<string> {
-  // If there's already an in-flight refresh for this user, reuse it
-  const existing = inflightRefreshes.get(userId);
+export async function refreshAccessToken(userId: string, circleId: string): Promise<string> {
+  // If there's already an in-flight refresh for this user+circle, reuse it
+  const key = `${userId}:${circleId}`;
+  const existing = inflightRefreshes.get(key);
   if (existing) return existing;
 
-  const promise = _doRefresh(userId);
-  inflightRefreshes.set(userId, promise);
+  const promise = _doRefresh(userId, circleId);
+  inflightRefreshes.set(key, promise);
   try {
     return await promise;
   } finally {
-    inflightRefreshes.delete(userId);
+    inflightRefreshes.delete(key);
   }
 }
 
-async function _doRefresh(userId: string): Promise<string> {
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
+async function _doRefresh(userId: string, circleId: string): Promise<string> {
+  const member = await db.query.circleMembers.findFirst({
+    where: and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)),
+    with: { circle: true },
   });
 
-  if (!user) throw new Error(`User ${userId} not found`);
+  if (!member) throw new Error(`Circle member not found for user ${userId} in circle ${circleId}`);
 
-  // User's refresh token was previously invalidated — skip
-  if (!user.refreshToken) {
-    throw new TokenInvalidError(userId, `User ${userId} has no refresh token (needs re-login)`);
+  // Member's refresh token was previously invalidated — skip
+  if (!member.refreshToken) {
+    throw new TokenInvalidError(
+      userId,
+      circleId,
+      `User ${userId} in circle ${circleId} has no refresh token (needs re-login)`
+    );
   }
 
   // Decrypt the refresh token before using it
-  const refreshToken = decrypt(user.refreshToken);
+  const refreshToken = decrypt(member.refreshToken);
 
   const now = Math.floor(Date.now() / 1000);
   // If token has > 5 minutes remaining, return existing (decrypt before returning)
-  if (user.tokenExpiresAt - now > 300) {
-    return decrypt(user.accessToken);
+  if (member.tokenExpiresAt - now > 300) {
+    return decrypt(member.accessToken);
   }
 
   const res = await fetch(`${SPOTIFY_ACCOUNTS}/api/token`, {
@@ -74,7 +81,7 @@ async function _doRefresh(userId: string): Promise<string> {
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
-      client_id: user.spotifyClientId || process.env.SPOTIFY_CLIENT_ID!,
+      client_id: member.circle.spotifyClientId,
     }),
   });
 
@@ -82,7 +89,11 @@ async function _doRefresh(userId: string): Promise<string> {
     const err = await res.text();
     // invalid_grant = refresh token revoked or already rotated — not retryable
     if (res.status === 400 && err.includes('invalid_grant')) {
-      throw new TokenInvalidError(userId, `Refresh token invalid for user ${userId}`);
+      throw new TokenInvalidError(
+        userId,
+        circleId,
+        `Refresh token invalid for user ${userId} in circle ${circleId}`
+      );
     }
     throw new Error(`Token refresh failed: ${res.status} ${err}`);
   }
@@ -90,13 +101,13 @@ async function _doRefresh(userId: string): Promise<string> {
   const data: SpotifyTokenResponse = await res.json();
 
   await db
-    .update(users)
+    .update(circleMembers)
     .set({
       accessToken: encrypt(data.access_token),
-      refreshToken: data.refresh_token ? encrypt(data.refresh_token) : user.refreshToken,
+      refreshToken: data.refresh_token ? encrypt(data.refresh_token) : member.refreshToken,
       tokenExpiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
     })
-    .where(eq(users.id, userId));
+    .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
 
   return data.access_token;
 }
@@ -119,6 +130,7 @@ export function rateLimitRemainingMs(): number {
 
 async function spotifyFetch(
   userId: string,
+  circleId: string,
   path: string,
   options: RequestInit = {},
   retries = 3
@@ -132,7 +144,7 @@ async function spotifyFetch(
   // Respect global API call budget (dev mode has much lower budget)
   await waitForBudget();
 
-  const token = await refreshAccessToken(userId);
+  const token = await refreshAccessToken(userId, circleId);
 
   trackSpotifyApiCall();
   const res = await fetch(`${SPOTIFY_API}${path}`, {
@@ -145,19 +157,22 @@ async function spotifyFetch(
   });
 
   if (res.status === 429) {
-    const retryAfter = parseInt(res.headers.get('Retry-After') || '1', 10);
+    const retryAfter = Number.parseInt(res.headers.get('Retry-After') || '1', 10);
     // Set app-level cooldown so other callers also back off
     rateLimitedUntil = Date.now() + retryAfter * 1000;
     if (retries > 0) {
       await new Promise((r) => setTimeout(r, retryAfter * 1000));
-      return spotifyFetch(userId, path, options, retries - 1);
+      return spotifyFetch(userId, circleId, path, options, retries - 1);
     }
   }
 
   if (res.status === 401 && retries > 0) {
     // Force refresh and retry — but if the token is permanently invalid, bail
-    await db.update(users).set({ tokenExpiresAt: 0 }).where(eq(users.id, userId));
-    return spotifyFetch(userId, path, options, retries - 1);
+    await db
+      .update(circleMembers)
+      .set({ tokenExpiresAt: 0 })
+      .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
+    return spotifyFetch(userId, circleId, path, options, retries - 1);
   }
 
   return res;
@@ -177,12 +192,13 @@ export async function getSpotifyProfile(accessToken: string): Promise<SpotifyUse
 
 export async function createPlaylist(
   userId: string,
+  circleId: string,
   name: string,
   description?: string,
   options?: { collaborative?: boolean }
 ): Promise<SpotifyPlaylist> {
   const collaborative = options?.collaborative ?? true;
-  const res = await spotifyFetch(userId, `/me/playlists`, {
+  const res = await spotifyFetch(userId, circleId, `/me/playlists`, {
     method: 'POST',
     body: JSON.stringify({
       name,
@@ -201,10 +217,11 @@ export async function createPlaylist(
 
 export async function updatePlaylistDetails(
   userId: string,
+  circleId: string,
   playlistId: string,
   details: { name?: string; description?: string }
 ): Promise<void> {
-  const res = await spotifyFetch(userId, `/playlists/${playlistId}`, {
+  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}`, {
     method: 'PUT',
     body: JSON.stringify(details),
   });
@@ -216,6 +233,7 @@ export async function updatePlaylistDetails(
 
 export async function uploadPlaylistImage(
   userId: string,
+  circleId: string,
   playlistId: string,
   base64Jpeg: string
 ): Promise<void> {
@@ -223,7 +241,7 @@ export async function uploadPlaylistImage(
   // We still track it against our global budget and respect rate limits.
   await waitForBudget();
 
-  const token = await refreshAccessToken(userId);
+  const token = await refreshAccessToken(userId, circleId);
 
   trackSpotifyApiCall();
   const res = await fetch(`${SPOTIFY_API}/playlists/${playlistId}/images`, {
@@ -247,8 +265,12 @@ export async function uploadPlaylistImage(
   }
 }
 
-export async function followPlaylist(userId: string, playlistId: string): Promise<void> {
-  const res = await spotifyFetch(userId, `/playlists/${playlistId}/followers`, {
+export async function followPlaylist(
+  userId: string,
+  circleId: string,
+  playlistId: string
+): Promise<void> {
+  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/followers`, {
     method: 'PUT',
     body: JSON.stringify({ public: false }),
   });
@@ -260,9 +282,14 @@ export async function followPlaylist(userId: string, playlistId: string): Promis
 
 export async function getPlaylistDetails(
   userId: string,
+  circleId: string,
   playlistId: string
 ): Promise<{ name: string; description: string | null; imageUrl: string | null }> {
-  const res = await spotifyFetch(userId, `/playlists/${playlistId}?fields=name,description,images`);
+  const res = await spotifyFetch(
+    userId,
+    circleId,
+    `/playlists/${playlistId}?fields=name,description,images`
+  );
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get playlist details: ${res.status} ${err}`);
@@ -278,13 +305,14 @@ export async function getPlaylistDetails(
 
 export async function getPlaylistItems(
   userId: string,
+  circleId: string,
   playlistId: string
 ): Promise<SpotifyPlaylistItem[]> {
   const allItems: SpotifyPlaylistItem[] = [];
   let url = `/playlists/${playlistId}/items?limit=50`;
 
   while (url) {
-    const res = await spotifyFetch(userId, url);
+    const res = await spotifyFetch(userId, circleId, url);
     if (!res.ok) {
       const err = await res.text();
       throw new Error(`Failed to get playlist items: ${res.status} ${err}`);
@@ -306,10 +334,11 @@ export async function getPlaylistItems(
 
 export async function addItemsToPlaylist(
   userId: string,
+  circleId: string,
   playlistId: string,
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
-  const res = await spotifyFetch(userId, `/playlists/${playlistId}/items`, {
+  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/items`, {
     method: 'POST',
     body: JSON.stringify({ uris }),
   });
@@ -322,10 +351,11 @@ export async function addItemsToPlaylist(
 
 export async function removeItemsFromPlaylist(
   userId: string,
+  circleId: string,
   playlistId: string,
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
-  const res = await spotifyFetch(userId, `/playlists/${playlistId}/items`, {
+  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/items`, {
     method: 'DELETE',
     body: JSON.stringify({
       tracks: uris.map((uri) => ({ uri })),
@@ -342,12 +372,13 @@ export async function removeItemsFromPlaylist(
 
 export async function getRecentlyPlayed(
   userId: string,
+  circleId: string,
   after?: number
 ): Promise<SpotifyRecentlyPlayedItem[]> {
   const params = new URLSearchParams({ limit: '50' });
   if (after) params.set('after', after.toString());
 
-  const res = await spotifyFetch(userId, `/me/player/recently-played?${params}`);
+  const res = await spotifyFetch(userId, circleId, `/me/player/recently-played?${params}`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get recently played: ${res.status} ${err}`);
@@ -361,6 +392,7 @@ export async function getRecentlyPlayed(
 
 export async function searchTracks(
   userId: string,
+  circleId: string,
   query: string,
   limit = spotifyConfig.searchLimit
 ): Promise<SpotifyTrack[]> {
@@ -370,7 +402,7 @@ export async function searchTracks(
     limit: limit.toString(),
   });
 
-  const res = await spotifyFetch(userId, `/search?${params}`);
+  const res = await spotifyFetch(userId, circleId, `/search?${params}`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to search: ${res.status} ${err}`);
@@ -383,9 +415,10 @@ export async function searchTracks(
 // ─── Current Playback ────────────────────────────────────────────────────────
 
 export async function getCurrentPlayback(
-  userId: string
+  userId: string,
+  circleId: string
 ): Promise<{ item?: SpotifyTrack; progress_ms?: number; is_playing?: boolean } | null> {
-  const res = await spotifyFetch(userId, '/me/player/currently-playing');
+  const res = await spotifyFetch(userId, circleId, '/me/player/currently-playing');
   if (res.status === 204) return null;
   if (!res.ok) return null;
   return res.json();
@@ -395,13 +428,14 @@ export async function getCurrentPlayback(
 
 export async function startPlayback(
   userId: string,
+  circleId: string,
   options: { contextUri?: string; trackUri: string }
 ): Promise<Response> {
   const body = options.contextUri
     ? { context_uri: options.contextUri, offset: { uri: options.trackUri } }
     : { uris: [options.trackUri] };
 
-  return spotifyFetch(userId, '/me/player/play', {
+  return spotifyFetch(userId, circleId, '/me/player/play', {
     method: 'PUT',
     body: JSON.stringify(body),
   });
@@ -409,16 +443,24 @@ export async function startPlayback(
 
 // ─── User Library ───────────────────────────────────────────────────────────
 
-export async function checkSavedTracks(userId: string, trackIds: string[]): Promise<boolean[]> {
-  const res = await spotifyFetch(userId, `/me/tracks/contains?ids=${trackIds.join(',')}`);
+export async function checkSavedTracks(
+  userId: string,
+  circleId: string,
+  trackIds: string[]
+): Promise<boolean[]> {
+  const res = await spotifyFetch(userId, circleId, `/me/tracks/contains?ids=${trackIds.join(',')}`);
   if (!res.ok) {
     throw new Error(`Failed to check saved tracks: ${res.status}`);
   }
   return res.json();
 }
 
-export async function saveTracks(userId: string, trackIds: string[]): Promise<void> {
-  const res = await spotifyFetch(userId, '/me/tracks', {
+export async function saveTracks(
+  userId: string,
+  circleId: string,
+  trackIds: string[]
+): Promise<void> {
+  const res = await spotifyFetch(userId, circleId, '/me/tracks', {
     method: 'PUT',
     body: JSON.stringify({ ids: trackIds }),
   });
@@ -427,8 +469,12 @@ export async function saveTracks(userId: string, trackIds: string[]): Promise<vo
   }
 }
 
-export async function removeSavedTracks(userId: string, trackIds: string[]): Promise<void> {
-  const res = await spotifyFetch(userId, '/me/tracks', {
+export async function removeSavedTracks(
+  userId: string,
+  circleId: string,
+  trackIds: string[]
+): Promise<void> {
+  const res = await spotifyFetch(userId, circleId, '/me/tracks', {
     method: 'DELETE',
     body: JSON.stringify({ ids: trackIds }),
   });
@@ -441,10 +487,11 @@ export async function removeSavedTracks(userId: string, trackIds: string[]): Pro
 
 export async function reorderPlaylistTracks(
   userId: string,
+  circleId: string,
   playlistId: string,
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
-  const res = await spotifyFetch(userId, `/playlists/${playlistId}/tracks`, {
+  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/tracks`, {
     method: 'PUT',
     body: JSON.stringify({ uris }),
   });

@@ -6,6 +6,7 @@ import {
   trackListens,
   trackReactions,
   users,
+  circleMembers,
 } from '@/db/schema';
 import { eq, and, isNull, isNotNull, inArray, ne, gt, lt } from 'drizzle-orm';
 import {
@@ -57,32 +58,50 @@ export async function runPollCycle(): Promise<PollCycleResult> {
 
   const playlistIds = activeTrackPlaylistIds.map((r) => r.playlistId);
 
-  // 2. Get all unique users across those playlists
-  const activeMembers = await db
-    .selectDistinct({ userId: playlistMembers.userId })
+  // 2. Get all unique (userId, circleId) pairs across those playlists.
+  //    Join playlistMembers → playlists to get circleId, then join with
+  //    circleMembers to ensure the user has token data for that circle.
+  const activePairs = await db
+    .selectDistinct({
+      userId: playlistMembers.userId,
+      circleId: playlists.circleId,
+    })
     .from(playlistMembers)
+    .innerJoin(playlists, eq(playlistMembers.playlistId, playlists.id))
+    .innerJoin(
+      circleMembers,
+      and(
+        eq(circleMembers.userId, playlistMembers.userId),
+        eq(circleMembers.circleId, playlists.circleId)
+      )
+    )
     .where(inArray(playlistMembers.playlistId, playlistIds));
 
   // Spread API calls across ~50% of the poll interval to avoid bursts.
   // At least 300ms between users, at most 2s.
-  const interUserDelayMs = Math.min(2000, Math.max(300, Math.floor(15000 / activeMembers.length)));
+  const interUserDelayMs = Math.min(2000, Math.max(300, Math.floor(15000 / activePairs.length)));
 
-  // 3. Poll each user
-  for (const { userId } of activeMembers) {
+  // 3. Poll each (user, circle) pair
+  for (const { userId, circleId } of activePairs) {
     if (isRateLimited() || isOverBudget()) {
       logger.warn('[Swapify] Rate-limited or over API budget, aborting poll cycle');
       break;
     }
 
     try {
-      await pollUser(userId, counters);
+      await pollUser(userId, circleId, counters);
     } catch (error) {
       if (error instanceof TokenInvalidError) {
-        logger.warn(`[Swapify] Token invalid for user ${userId}, clearing refresh token`);
-        const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-        // Clear refresh token so poller skips this user until they re-login
-        await db.update(users).set({ refreshToken: '' }).where(eq(users.id, userId));
+        logger.warn(
+          `[Swapify] Token invalid for user ${userId} in circle ${circleId}, clearing refresh token`
+        );
+        // Clear refresh token on circleMembers so poller skips this user+circle until they re-login
+        await db
+          .update(circleMembers)
+          .set({ refreshToken: '' })
+          .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
         // Account-critical email — always send regardless of notifyEmail preference
+        const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
         if (user?.email) {
           await sendEmail(
             user.email,
@@ -94,7 +113,7 @@ export async function runPollCycle(): Promise<PollCycleResult> {
         }
         continue;
       }
-      logger.error({ error, userId }, 'Error polling user');
+      logger.error({ error, userId, circleId }, 'Error polling user');
     }
 
     await new Promise((r) => setTimeout(r, interUserDelayMs));
@@ -162,7 +181,7 @@ export async function runPollCycle(): Promise<PollCycleResult> {
     }
   }
 
-  // 8. Sync liked playlists every N cycles
+  // 9. Sync liked playlists every N cycles
   likedSyncCycleCount++;
   if (likedSyncCycleCount >= spotifyConfig.likedSyncEveryNCycles) {
     likedSyncCycleCount = 0;
@@ -173,30 +192,42 @@ export async function runPollCycle(): Promise<PollCycleResult> {
     }
   }
 
-  return { usersPolled: activeMembers.length, ...counters };
+  return { usersPolled: activePairs.length, ...counters };
 }
 
 // ─── Per-User Polling ───────────────────────────────────────────────────────
 
 async function pollUser(
   userId: string,
+  circleId: string,
   counters: { listensRecorded: number; skipsDetected: number; tracksRemoved: number }
 ): Promise<void> {
+  // Read token/cursor data from circleMembers
+  const member = await db.query.circleMembers.findFirst({
+    where: and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)),
+  });
+  if (!member) return;
+
+  // Skip users whose refresh token was cleared (needs re-login)
+  if (!member.refreshToken) return;
+
+  // Get user profile for autoNegativeReactions preference
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
   if (!user) return;
 
-  // Skip users whose refresh token was cleared (needs re-login)
-  if (!user.refreshToken) return;
+  const recentTracks = await getRecentlyPlayed(
+    userId,
+    circleId,
+    member.lastPollCursor ?? undefined
+  );
 
-  const recentTracks = await getRecentlyPlayed(userId, user.lastPollCursor ?? undefined);
-
-  // Parse last playback snapshot
+  // Parse last playback snapshot (from circleMembers)
   let lastPlayback: PlaybackSnapshot | null = null;
-  if (user.lastPlaybackJson) {
+  if (member.lastPlaybackJson) {
     try {
-      lastPlayback = JSON.parse(user.lastPlaybackJson);
+      lastPlayback = JSON.parse(member.lastPlaybackJson);
     } catch {
       // Invalid JSON, ignore
     }
@@ -208,7 +239,7 @@ async function pollUser(
   let currentPlayback: Awaited<ReturnType<typeof getCurrentPlayback>> = null;
   if (lastPlayback || recentTracks.length > 0) {
     try {
-      currentPlayback = await getCurrentPlayback(userId);
+      currentPlayback = await getCurrentPlayback(userId, circleId);
     } catch {
       // Non-critical, continue without skip detection
     }
@@ -231,16 +262,19 @@ async function pollUser(
   const latestCursor = await processRecentlyPlayed(
     userId,
     recentTracks,
-    user.lastPollCursor ?? 0,
+    member.lastPollCursor ?? 0,
     counters
   );
 
-  // Update cursor
-  if (latestCursor > (user.lastPollCursor ?? 0)) {
-    await db.update(users).set({ lastPollCursor: latestCursor }).where(eq(users.id, userId));
+  // Update cursor on circleMembers
+  if (latestCursor > (member.lastPollCursor ?? 0)) {
+    await db
+      .update(circleMembers)
+      .set({ lastPollCursor: latestCursor })
+      .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
   }
 
-  // Save playback snapshot (only when actively playing — don't clear on pause)
+  // Save playback snapshot on circleMembers (only when actively playing — don't clear on pause)
   if (isCurrentlyPlaying && currentPlayback?.item) {
     const snapshot: PlaybackSnapshot = {
       trackId: currentPlayback.item.id,
@@ -249,9 +283,9 @@ async function pollUser(
       capturedAt: Date.now(),
     };
     await db
-      .update(users)
+      .update(circleMembers)
       .set({ lastPlaybackJson: JSON.stringify(snapshot) })
-      .where(eq(users.id, userId));
+      .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
   }
 }
 
@@ -465,7 +499,7 @@ async function removeAndArchiveTrack(
   playlist: typeof playlists.$inferSelect
 ): Promise<boolean> {
   try {
-    await removeItemsFromPlaylist(playlist.ownerId, playlist.spotifyPlaylistId, [
+    await removeItemsFromPlaylist(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId, [
       track.spotifyTrackUri,
     ]);
   } catch (error) {
@@ -665,13 +699,25 @@ async function checkSavedTracksForAutoLike(): Promise<void> {
   for (const [playlistId, tracks] of tracksByPlaylist) {
     if (isRateLimited() || isOverBudget()) break;
 
+    // Resolve the circleId for this playlist
+    const playlist = await db.query.playlists.findFirst({
+      where: eq(playlists.id, playlistId),
+    });
+    if (!playlist) continue;
+
     const members = await db.query.playlistMembers.findMany({
       where: eq(playlistMembers.playlistId, playlistId),
     });
 
     for (const member of members) {
       if (isRateLimited() || isOverBudget()) break;
-      await checkMemberSavedTracks(playlistId, tracks, member.userId, upReactionKeys);
+      await checkMemberSavedTracks(
+        playlistId,
+        playlist.circleId,
+        tracks,
+        member.userId,
+        upReactionKeys
+      );
     }
   }
 }
@@ -679,6 +725,7 @@ async function checkSavedTracksForAutoLike(): Promise<void> {
 /** Check whether a single member has saved any of the given playlist tracks to their library. */
 async function checkMemberSavedTracks(
   playlistId: string,
+  circleId: string,
   tracks: (typeof playlistTracks.$inferSelect)[],
   userId: string,
   upReactionKeys: Set<string>
@@ -699,6 +746,7 @@ async function checkMemberSavedTracks(
     try {
       const savedFlags = await checkSavedTracks(
         userId,
+        circleId,
         batch.map((t) => t.spotifyTrackId)
       );
       for (let j = 0; j < batch.length; j++) {
@@ -753,7 +801,11 @@ async function auditPlaylist(
   });
   if (!playlist) return;
 
-  const spotifyItems = await getPlaylistItems(playlist.ownerId, playlist.spotifyPlaylistId);
+  const spotifyItems = await getPlaylistItems(
+    playlist.ownerId,
+    playlist.circleId,
+    playlist.spotifyPlaylistId
+  );
 
   const localTracks = await db.query.playlistTracks.findMany({
     where: and(eq(playlistTracks.playlistId, playlistId), isNull(playlistTracks.removedAt)),
@@ -835,7 +887,12 @@ async function auditPlaylist(
 
   if (urisToRemove.length > 0) {
     try {
-      await removeItemsFromPlaylist(playlist.ownerId, playlist.spotifyPlaylistId, urisToRemove);
+      await removeItemsFromPlaylist(
+        playlist.ownerId,
+        playlist.circleId,
+        playlist.spotifyPlaylistId,
+        urisToRemove
+      );
     } catch (error) {
       logger.error({ error }, '[Swapify] Failed to remove unauthorized/over-limit tracks');
     }
@@ -853,6 +910,7 @@ async function auditPlaylist(
 
 export async function syncLikedPlaylist(
   userId: string,
+  circleId: string,
   playlistId: string,
   likedPlaylistId: string
 ): Promise<boolean> {
@@ -881,7 +939,7 @@ export async function syncLikedPlaylist(
   // Get current Spotify playlist contents
   let spotifyItems: Awaited<ReturnType<typeof getPlaylistItems>>;
   try {
-    spotifyItems = await getPlaylistItems(userId, likedPlaylistId);
+    spotifyItems = await getPlaylistItems(userId, circleId, likedPlaylistId);
   } catch (error) {
     if (String(error).includes('404') || String(error).includes('Not Found')) {
       // Playlist was deleted — clear likedPlaylistId
@@ -907,12 +965,12 @@ export async function syncLikedPlaylist(
 
   if (toAdd.length > 0) {
     for (let i = 0; i < toAdd.length; i += 100) {
-      await addItemsToPlaylist(userId, likedPlaylistId, toAdd.slice(i, i + 100));
+      await addItemsToPlaylist(userId, circleId, likedPlaylistId, toAdd.slice(i, i + 100));
     }
   }
   if (toRemove.length > 0) {
     for (let i = 0; i < toRemove.length; i += 100) {
-      await removeItemsFromPlaylist(userId, likedPlaylistId, toRemove.slice(i, i + 100));
+      await removeItemsFromPlaylist(userId, circleId, likedPlaylistId, toRemove.slice(i, i + 100));
     }
   }
 
@@ -926,8 +984,20 @@ async function syncAllLikedPlaylists(): Promise<void> {
 
   for (const member of membersWithLiked) {
     if (isRateLimited() || isOverBudget()) break;
+
+    // Resolve the circleId for this playlist
+    const playlist = await db.query.playlists.findFirst({
+      where: eq(playlists.id, member.playlistId),
+    });
+    if (!playlist) continue;
+
     try {
-      await syncLikedPlaylist(member.userId, member.playlistId, member.likedPlaylistId!);
+      await syncLikedPlaylist(
+        member.userId,
+        playlist.circleId,
+        member.playlistId,
+        member.likedPlaylistId!
+      );
     } catch (error) {
       if (error instanceof TokenInvalidError) {
         logger.warn(`[Swapify] Token invalid for user ${member.userId} during liked sync`);

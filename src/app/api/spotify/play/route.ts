@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getSession } from '@/lib/auth';
 import { startPlayback } from '@/lib/spotify';
 
 export async function PUT(request: NextRequest) {
   const user = await requireAuth();
+
+  const session = await getSession();
+  const circleId = session.activeCircleId;
+  if (!circleId) {
+    return NextResponse.json({ error: 'No active circle selected' }, { status: 400 });
+  }
 
   const { trackUri, contextUri } = await request.json();
   if (!trackUri) {
     return NextResponse.json({ error: 'trackUri is required' }, { status: 400 });
   }
 
-  const res = await startPlayback(user.id, { contextUri, trackUri });
+  const res = await startPlayback(user.id, circleId, { contextUri, trackUri });
 
   if (res.status === 204 || res.ok) {
     return NextResponse.json({ ok: true });

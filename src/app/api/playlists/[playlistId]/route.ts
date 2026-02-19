@@ -107,14 +107,23 @@ export async function PATCH(
   if (description !== undefined) spotifyUpdates.description = description;
 
   if (Object.keys(spotifyUpdates).length > 0) {
-    await updatePlaylistDetails(user.id, playlist.spotifyPlaylistId, spotifyUpdates);
+    await updatePlaylistDetails(
+      user.id,
+      playlist.circleId,
+      playlist.spotifyPlaylistId,
+      spotifyUpdates
+    );
   }
 
   // Upload cover image if provided, then fetch the CDN URL from Spotify
   if (imageBase64) {
-    await uploadPlaylistImage(user.id, playlist.spotifyPlaylistId, imageBase64);
+    await uploadPlaylistImage(user.id, playlist.circleId, playlist.spotifyPlaylistId, imageBase64);
     // Spotify processes the image async — fetch the CDN URL it generates
-    const details = await getPlaylistDetails(user.id, playlist.spotifyPlaylistId);
+    const details = await getPlaylistDetails(
+      user.id,
+      playlist.circleId,
+      playlist.spotifyPlaylistId
+    );
     updates.imageUrl = details.imageUrl;
   }
 

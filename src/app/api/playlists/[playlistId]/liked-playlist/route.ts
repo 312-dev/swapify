@@ -31,7 +31,7 @@ export async function POST(
   // If user already has a liked playlist, verify it still exists
   if (membership.likedPlaylistId) {
     try {
-      await getPlaylistDetails(user.id, membership.likedPlaylistId);
+      await getPlaylistDetails(user.id, playlist.circleId, membership.likedPlaylistId);
       // Playlist exists — return it
       return NextResponse.json({
         spotifyPlaylistId: membership.likedPlaylistId,
@@ -49,6 +49,7 @@ export async function POST(
   // Create new Spotify playlist under this user's account
   const spotifyPlaylist = await createPlaylist(
     user.id,
+    playlist.circleId,
     `${playlist.name} Likes`,
     `Tracks I liked from ${playlist.name} on Swapify`,
     { collaborative: false }
@@ -81,7 +82,12 @@ export async function POST(
     ];
     if (uris.length > 0) {
       for (let i = 0; i < uris.length; i += 100) {
-        await addItemsToPlaylist(user.id, spotifyPlaylist.id, uris.slice(i, i + 100));
+        await addItemsToPlaylist(
+          user.id,
+          playlist.circleId,
+          spotifyPlaylist.id,
+          uris.slice(i, i + 100)
+        );
       }
     }
   }

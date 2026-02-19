@@ -9,7 +9,7 @@ interface ShareSheetProps {
   inviteCode: string;
   playlistId: string;
   playlistName: string;
-  ownerSpotifyClientId?: string;
+  circleSpotifyClientId?: string;
 }
 
 export default function ShareSheet({
@@ -18,7 +18,7 @@ export default function ShareSheet({
   inviteCode,
   playlistId,
   playlistName,
-  ownerSpotifyClientId,
+  circleSpotifyClientId,
 }: ShareSheetProps) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -31,7 +31,7 @@ export default function ShareSheet({
 
   const inviteUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/playlist/join?code=${inviteCode}${ownerSpotifyClientId ? `&cid=${ownerSpotifyClientId}` : ''}`
+      ? `${window.location.origin}/playlist/join?code=${inviteCode}${circleSpotifyClientId ? `&cid=${circleSpotifyClientId}` : ''}`
       : '';
 
   function handleCopyCode() {

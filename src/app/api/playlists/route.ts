@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getSession } from '@/lib/auth';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { db } from '@/db';
 import { playlists, playlistMembers, trackListens } from '@/db/schema';
@@ -61,6 +61,12 @@ export async function POST(request: NextRequest) {
   const limited = checkRateLimit(`mutation:${user.id}`, RATE_LIMITS.mutation);
   if (limited) return limited;
 
+  const session = await getSession();
+  const circleId = session.activeCircleId;
+  if (!circleId) {
+    return NextResponse.json({ error: 'No active circle selected' }, { status: 400 });
+  }
+
   const body = await request.json();
   const { name, description, imageBase64 } = body;
 
@@ -69,13 +75,13 @@ export async function POST(request: NextRequest) {
   const inviteCode = generateInviteCode();
 
   // Create Spotify playlist
-  const spotifyPlaylist = await createPlaylist(user.id, defaultName, description);
+  const spotifyPlaylist = await createPlaylist(user.id, circleId, defaultName, description);
 
   // Upload cover image if provided
   let imageUrl: string | null = null;
   if (imageBase64) {
-    await uploadPlaylistImage(user.id, spotifyPlaylist.id, imageBase64);
-    const details = await getPlaylistDetails(user.id, spotifyPlaylist.id);
+    await uploadPlaylistImage(user.id, circleId, spotifyPlaylist.id, imageBase64);
+    const details = await getPlaylistDetails(user.id, circleId, spotifyPlaylist.id);
     imageUrl = details.imageUrl;
   }
 
@@ -86,6 +92,7 @@ export async function POST(request: NextRequest) {
     description: description || null,
     spotifyPlaylistId: spotifyPlaylist.id,
     ownerId: user.id,
+    circleId,
     inviteCode,
     imageUrl,
   });

@@ -55,7 +55,11 @@ export async function GET(
   let tracks = dbTracks;
   if (playlist && dbTracks.length > 1) {
     try {
-      const spotifyItems = await getPlaylistItems(playlist.ownerId, playlist.spotifyPlaylistId);
+      const spotifyItems = await getPlaylistItems(
+        playlist.ownerId,
+        playlist.circleId,
+        playlist.spotifyPlaylistId
+      );
       const spotifyOrder = new Map(spotifyItems.map((item, i) => [item.track.uri, i]));
       tracks = [...dbTracks].sort((a, b) => {
         const posA = spotifyOrder.get(a.spotifyTrackUri) ?? Infinity;
@@ -106,15 +110,23 @@ export async function GET(
     capturedAt: number;
   }
   const memberPlayback = new Map<string, PlaybackInfo>(); // userId -> playback snapshot
-  for (const m of members) {
-    if (m.user.lastPlaybackJson) {
-      try {
-        const snap = JSON.parse(m.user.lastPlaybackJson) as PlaybackInfo;
-        if (snap.trackId && now - snap.capturedAt < PLAYBACK_FRESHNESS_MS) {
-          memberPlayback.set(m.user.id, snap);
+
+  // Playback data is stored per-circle on circle_members, not on users
+  if (playlist) {
+    const { circleMembers } = await import('@/db/schema');
+    const circleMemberRows = await db.query.circleMembers.findMany({
+      where: eq(circleMembers.circleId, playlist.circleId),
+    });
+    for (const cm of circleMemberRows) {
+      if (cm.lastPlaybackJson) {
+        try {
+          const snap = JSON.parse(cm.lastPlaybackJson) as PlaybackInfo;
+          if (snap.trackId && now - snap.capturedAt < PLAYBACK_FRESHNESS_MS) {
+            memberPlayback.set(cm.userId, snap);
+          }
+        } catch {
+          // Invalid JSON, skip
         }
-      } catch {
-        // Invalid JSON, skip
       }
     }
   }
@@ -339,7 +351,9 @@ export async function POST(
 
   // Add to Spotify playlist using owner's token
   try {
-    await addItemsToPlaylist(playlist.ownerId, playlist.spotifyPlaylistId, [spotifyTrackUri]);
+    await addItemsToPlaylist(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId, [
+      spotifyTrackUri,
+    ]);
   } catch (err) {
     console.error('Spotify addItemsToPlaylist failed:', err);
     return NextResponse.json(
@@ -395,7 +409,9 @@ export async function POST(
       for (const member of otherMembers) {
         if (isRateLimited()) break;
         try {
-          const [isSaved] = await checkSavedTracks(member.userId, [spotifyTrackId]);
+          const [isSaved] = await checkSavedTracks(member.userId, playlist.circleId, [
+            spotifyTrackId,
+          ]);
           if (isSaved) {
             await setAutoReaction(playlistId, spotifyTrackId, member.userId, 'thumbs_up');
           }

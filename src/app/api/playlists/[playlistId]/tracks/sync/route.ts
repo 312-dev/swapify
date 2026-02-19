@@ -31,8 +31,8 @@ export async function POST(
 
   // Fetch playlist metadata + items from Spotify in parallel
   const [spotifyDetails, spotifyItems] = await Promise.all([
-    getPlaylistDetails(playlist.ownerId, playlist.spotifyPlaylistId),
-    getPlaylistItems(playlist.ownerId, playlist.spotifyPlaylistId),
+    getPlaylistDetails(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
+    getPlaylistItems(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
   ]);
 
   // Check if metadata changed on Spotify and update local DB

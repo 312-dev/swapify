@@ -37,7 +37,12 @@ export async function vibeSort(playlistId: string): Promise<void> {
   });
 
   const sortedUris = sorted.map((t) => t.spotifyTrackUri);
-  await reorderPlaylistTracks(playlist.ownerId, playlist.spotifyPlaylistId, sortedUris);
+  await reorderPlaylistTracks(
+    playlist.ownerId,
+    playlist.circleId,
+    playlist.spotifyPlaylistId,
+    sortedUris
+  );
 
   // Regenerate vibe name from the already-fetched scores (fire-and-forget)
   generateAndSaveVibeName(playlistId, trackData, vibeScores).catch(() => {});

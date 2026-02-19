@@ -28,7 +28,7 @@ interface PlaylistDetailClientProps {
   currentUserId: string;
   spotifyPlaylistId: string;
   vibeName: string | null;
-  ownerSpotifyClientId?: string;
+  circleSpotifyClientId?: string;
 }
 
 interface TrackData {
@@ -108,7 +108,7 @@ export default function PlaylistDetailClient({
   currentUserId,
   spotifyPlaylistId,
   vibeName,
-  ownerSpotifyClientId,
+  circleSpotifyClientId,
 }: PlaylistDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -562,7 +562,7 @@ export default function PlaylistDetailClient({
         inviteCode={inviteCode}
         playlistId={playlistId}
         playlistName={currentName}
-        ownerSpotifyClientId={ownerSpotifyClientId}
+        circleSpotifyClientId={circleSpotifyClientId}
       />
 
       {/* Edit details modal */}

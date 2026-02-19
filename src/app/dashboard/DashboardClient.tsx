@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ImagePlus, Pencil } from 'lucide-react';
 import PlaylistCard from '@/components/PlaylistCard';
 import GlassDrawer from '@/components/ui/glass-drawer';
 import NotificationPrompt from '@/components/NotificationPrompt';
+import CircleSwitcher from '@/components/CircleSwitcher';
+import SpotifySetupWizard from '@/components/SpotifySetupWizard';
 
 function Spinner() {
   return (
@@ -43,17 +45,69 @@ interface DashboardClientProps {
   playlists: PlaylistData[];
   userName: string;
   notifyPush: boolean;
+  circles: Array<{
+    id: string;
+    name: string;
+    imageUrl: string | null;
+    spotifyClientId: string;
+    role: string;
+    memberCount: number;
+  }>;
+  activeCircleId: string | null;
+  activeCircleName: string | null;
+  syncCircleId?: string | null;
 }
 
-interface PlaylistPreview {
-  id: string;
+const VIBE_PLACEHOLDERS: Array<{
   name: string;
-  description: string | null;
-  owner: { displayName: string; avatarUrl: string | null };
-  memberCount: number;
-  members: Array<{ displayName: string; avatarUrl: string | null }>;
-  inviteCode: string;
-}
+  desc: string;
+  vibeLine: string;
+  emoji: string;
+  gradient: [string, string];
+}> = [
+  {
+    name: 'late night drives',
+    desc: 'windows down, vibes up',
+    vibeLine: 'moody R&B \u00b7 chill rap \u00b7 slow jams',
+    emoji: '\ud83c\udf19',
+    gradient: ['#1e1b4b', '#312e81'],
+  },
+  {
+    name: 'UNHINGED BANGERS',
+    desc: 'no skips, only chaos',
+    vibeLine: 'hyperpop \u00b7 hard drops \u00b7 EDM',
+    emoji: '\ud83d\udd25',
+    gradient: ['#7f1d1d', '#dc2626'],
+  },
+  {
+    name: 'main character energy',
+    desc: 'the soundtrack to your villain arc',
+    vibeLine: 'indie pop \u00b7 alt \u00b7 cinematic',
+    emoji: '\u2728',
+    gradient: ['#581c87', '#a855f7'],
+  },
+  {
+    name: 'COZY GIRL AUTUMN',
+    desc: 'candles lit, oversized hoodie on',
+    vibeLine: 'soft folk \u00b7 acoustic \u00b7 bedroom pop',
+    emoji: '\ud83c\udf42',
+    gradient: ['#78350f', '#d97706'],
+  },
+  {
+    name: 'gym arc',
+    desc: 'PR or ER, no in between',
+    vibeLine: 'trap \u00b7 drill \u00b7 rage beats',
+    emoji: '\ud83d\udcaa',
+    gradient: ['#14532d', '#22c55e'],
+  },
+  {
+    name: 'TOUCH GRASS',
+    desc: 'for when the group chat goes outside',
+    vibeLine: 'feel-good \u00b7 summer hits \u00b7 throwbacks',
+    emoji: '\ud83c\udf3b',
+    gradient: ['#164e63', '#38bdf8'],
+  },
+];
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -62,11 +116,29 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-export default function DashboardClient({ playlists, notifyPush }: DashboardClientProps) {
+export default function DashboardClient({
+  playlists,
+  notifyPush,
+  circles,
+  activeCircleId,
+  activeCircleName,
+  syncCircleId,
+}: DashboardClientProps) {
   const router = useRouter();
 
+  // Persist auto-defaulted circle to session on mount
+  useEffect(() => {
+    if (syncCircleId) {
+      fetch('/api/circles/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ circleId: syncCircleId }),
+      }).catch(() => {});
+    }
+  }, [syncCircleId]);
+
   const [showCreate, setShowCreate] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   // Create form state
   const [createName, setCreateName] = useState('');
@@ -74,12 +146,6 @@ export default function DashboardClient({ playlists, notifyPush }: DashboardClie
   const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const createFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Join form state
-  const [joinCode, setJoinCode] = useState('');
-  const [joinPreview, setJoinPreview] = useState<PlaylistPreview | null>(null);
-  const [isLooking, setIsLooking] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -109,48 +175,6 @@ export default function DashboardClient({ playlists, notifyPush }: DashboardClie
     }
   }
 
-  async function lookupCode(inviteCode: string) {
-    setIsLooking(true);
-    setJoinPreview(null);
-
-    try {
-      const res = await fetch(`/api/playlists/resolve?code=${encodeURIComponent(inviteCode)}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Invalid invite code');
-      }
-      const playlist = await res.json();
-      setJoinPreview(playlist);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Invalid invite code');
-    } finally {
-      setIsLooking(false);
-    }
-  }
-
-  async function handleJoin() {
-    if (!joinPreview) return;
-    setIsJoining(true);
-
-    try {
-      const res = await fetch(`/api/playlists/${joinPreview.id}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteCode: joinPreview.inviteCode }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to join');
-      }
-
-      router.push(`/playlist/${joinPreview.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to join');
-      setIsJoining(false);
-    }
-  }
-
   function resetCreateForm() {
     setCreateName('');
     setCreateDesc('');
@@ -170,17 +194,53 @@ export default function DashboardClient({ playlists, notifyPush }: DashboardClie
     reader.readAsDataURL(file);
   }
 
-  function resetJoinForm() {
-    setJoinCode('');
-    setJoinPreview(null);
-    setIsLooking(false);
-    setIsJoining(false);
+  // No circles at all — user needs to create one
+  if (circles.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <header className="px-5 pt-6 pb-4">
+          <p className="text-base text-text-secondary">{getGreeting()},</p>
+          <h1 className="text-3xl font-bold text-text-primary mt-1">Welcome to Swapify</h1>
+        </header>
+
+        <div className="py-16 px-6 text-center">
+          <svg
+            className="w-16 h-16 text-text-tertiary mx-auto mb-4"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6ZM10 19a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z" />
+          </svg>
+          <h2 className="text-xl font-semibold text-text-primary">Create Your Circle</h2>
+          <p className="text-base text-text-secondary mt-2 mb-6">
+            Connect your Spotify app to get started. You&apos;ll create a circle that friends can
+            join.
+          </p>
+          <button onClick={() => setShowSetupWizard(true)} className="btn-pill btn-pill-primary">
+            Get Started
+          </button>
+        </div>
+
+        <SpotifySetupWizard isOpen={showSetupWizard} onClose={() => setShowSetupWizard(false)} />
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Circle switcher — centered at top, Life360 style */}
+      {circles.length > 0 && (
+        <div className="pt-5 pb-2 flex justify-center">
+          <CircleSwitcher
+            circles={circles}
+            activeCircleId={activeCircleId}
+            activeCircleName={activeCircleName}
+          />
+        </div>
+      )}
+
       {/* Header */}
-      <header className="px-5 pt-6 pb-4 flex items-start justify-between">
+      <header className="px-5 pt-2 pb-4 flex items-start justify-between">
         <div>
           <p className="text-base text-text-secondary">{getGreeting()},</p>
           <h1 className="text-3xl font-bold text-text-primary mt-1">Your Swaplists</h1>
@@ -206,25 +266,72 @@ export default function DashboardClient({ playlists, notifyPush }: DashboardClie
 
       {/* Playlist list */}
       {playlists.length === 0 ? (
-        <div className="py-16 px-6 text-center">
-          <svg
-            className="w-16 h-16 text-text-tertiary mx-auto mb-4"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6ZM10 19a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z" />
-          </svg>
-          <h2 className="text-xl font-semibold text-text-primary">No Swaplists yet</h2>
-          <p className="text-base text-text-secondary mt-2 mb-6">
-            Create your first collaborative playlist or join one
-          </p>
-          <div className="flex gap-3 justify-center">
-            <button onClick={() => setShowCreate(true)} className="btn-pill btn-pill-primary">
-              Create a Swaplist
-            </button>
-            <button onClick={() => setShowJoin(true)} className="btn-pill btn-pill-secondary">
-              Join with code
-            </button>
+        <div className="px-4 pt-2 pb-6">
+          <div className="relative overflow-hidden">
+            {/* Decorative placeholder cards */}
+            <div className="space-y-2 opacity-40 saturate-0 pointer-events-none">
+              {VIBE_PLACEHOLDERS.slice(0, 3).map((vibe, i) => (
+                <div
+                  key={vibe.name}
+                  className="glass rounded-2xl p-3.5 w-full text-left"
+                  style={i >= 1 ? { filter: `blur(${i * 1.5}px)` } : undefined}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className="w-14 h-14 shrink-0 rounded-lg overflow-hidden flex items-center justify-center text-2xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${vibe.gradient[0]}, ${vibe.gradient[1]})`,
+                      }}
+                    >
+                      {vibe.emoji}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-semibold truncate text-text-primary leading-tight">
+                        {vibe.name}
+                      </p>
+                      <p className="text-[12px] text-brand/80 italic truncate mt-0.5">
+                        {vibe.vibeLine}
+                      </p>
+                      <p className="text-[13px] text-text-tertiary mt-0.5">{vibe.desc}</p>
+                    </div>
+                    <svg
+                      className="w-4 h-4 text-text-tertiary/60 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Fade + blur overlay */}
+            <div
+              className="absolute inset-x-0 bottom-0 h-32 pointer-events-none backdrop-blur-sm"
+              style={{
+                background: 'linear-gradient(to bottom, transparent, var(--background))',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent, black)',
+                maskImage: 'linear-gradient(to bottom, transparent, black)',
+              }}
+            />
+            {/* Action button — floating centered over the list */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="rounded-full px-5 py-4"
+                style={{
+                  background:
+                    'radial-gradient(ellipse at center, var(--background) 30%, transparent 70%)',
+                }}
+              >
+                <button onClick={() => setShowCreate(true)} className="btn-pill btn-pill-primary">
+                  Create Swaplist
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
@@ -324,115 +431,6 @@ export default function DashboardClient({ playlists, notifyPush }: DashboardClie
             )}
           </button>
         </form>
-      </GlassDrawer>
-
-      {/* Join Bottom Sheet */}
-      <GlassDrawer
-        isOpen={showJoin}
-        onClose={() => {
-          setShowJoin(false);
-          resetJoinForm();
-        }}
-        title="Join a Swaplist"
-        snapPoint="half"
-      >
-        {!joinPreview ? (
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="join-code"
-                className="block text-base font-medium text-text-secondary mb-2"
-              >
-                Invite code
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="join-code"
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  placeholder="Enter invite code"
-                  className="input-glass flex-1"
-                />
-                <button
-                  onClick={() => lookupCode(joinCode)}
-                  disabled={!joinCode.trim() || isLooking}
-                  className="btn-pill btn-pill-primary disabled:opacity-50"
-                >
-                  {isLooking ? (
-                    <>
-                      <Spinner /> Looking...
-                    </>
-                  ) : (
-                    'Find'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="glass rounded-xl p-5 text-center">
-              <h3 className="text-xl font-semibold text-text-primary mb-1">{joinPreview.name}</h3>
-              {joinPreview.description && (
-                <p className="text-base text-text-secondary mb-3">{joinPreview.description}</p>
-              )}
-              <p className="text-base text-text-secondary mb-3">
-                Created by {joinPreview.owner.displayName} &middot; {joinPreview.memberCount} member
-                {joinPreview.memberCount !== 1 ? 's' : ''}
-              </p>
-
-              {/* Member avatars */}
-              <div className="flex justify-center mb-4">
-                <div className="avatar-stack flex">
-                  {joinPreview.members.slice(0, 5).map((m, i) =>
-                    m.avatarUrl ? (
-                      <img
-                        key={i}
-                        src={m.avatarUrl}
-                        alt={m.displayName}
-                        className="w-8 h-8 rounded-full"
-                        data-tooltip={m.displayName}
-                      />
-                    ) : (
-                      <div
-                        key={i}
-                        className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm text-text-secondary"
-                        data-tooltip={m.displayName}
-                      >
-                        {m.displayName[0]}
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-
-              <button
-                onClick={handleJoin}
-                disabled={isJoining}
-                className="btn-pill btn-pill-primary w-full disabled:opacity-50"
-              >
-                {isJoining ? (
-                  <>
-                    <Spinner /> Joining...
-                  </>
-                ) : (
-                  'Join this Swaplist'
-                )}
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                setJoinPreview(null);
-                setJoinCode('');
-              }}
-              className="text-base text-text-secondary hover:text-text-primary transition-colors"
-            >
-              Use a different code
-            </button>
-          </div>
-        )}
       </GlassDrawer>
     </div>
   );
