@@ -2,6 +2,16 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { subscribeToPush } from '@/lib/push-client';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_TYPE_LABELS,
+  DEFAULT_NOTIFICATION_PREFS,
+  parseNotificationPrefs,
+  type NotificationType,
+  type NotificationPrefs,
+} from '@/lib/notification-prefs';
 
 interface ProfileClientProps {
   user: {
@@ -9,9 +19,10 @@ interface ProfileClientProps {
     avatarUrl: string | null;
     email: string | null;
     pendingEmail: string | null;
-    notifyPush: number;
-    notifyEmail: number;
-    autoNegativeReactions: number;
+    notifyPush: boolean;
+    notifyEmail: boolean;
+    notificationPrefs: string | null;
+    autoNegativeReactions: boolean;
   };
   stats: {
     jamCount: number;
@@ -27,6 +38,57 @@ export default function ProfileClient(props: ProfileClientProps) {
   );
 }
 
+async function updatePreference(key: string, value: boolean): Promise<boolean> {
+  try {
+    const res = await fetch('/api/profile/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    });
+    if (!res.ok) throw new Error();
+    return true;
+  } catch {
+    toast.error('Failed to save preference');
+    return false;
+  }
+}
+
+async function updateNotificationPref(
+  type: NotificationType,
+  channel: 'push' | 'email',
+  value: boolean
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/profile/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notificationPrefs: { [type]: { [channel]: value } },
+      }),
+    });
+    if (!res.ok) throw new Error();
+    return true;
+  } catch {
+    toast.error('Failed to save preference');
+    return false;
+  }
+}
+
+async function resetNotificationPrefs(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/profile/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resetNotificationPrefs: true }),
+    });
+    if (!res.ok) throw new Error();
+    return true;
+  } catch {
+    toast.error('Failed to reset preferences');
+    return false;
+  }
+}
+
 function ProfileContent({ user, stats }: ProfileClientProps) {
   const searchParams = useSearchParams();
 
@@ -34,6 +96,11 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [prefs, setPrefs] = useState<NotificationPrefs>(() =>
+    parseNotificationPrefs(user.notificationPrefs)
+  );
+  const [pushMaster, setPushMaster] = useState(user.notifyPush);
+  const [emailMaster, setEmailMaster] = useState(user.notifyEmail);
 
   useEffect(() => {
     const emailVerified = searchParams.get('emailVerified');
@@ -121,6 +188,67 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
     }
   }
 
+  async function handlePushMasterToggle(enabled: boolean): Promise<boolean> {
+    if (enabled) {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+        toast.error('Push notifications are not supported in this browser');
+        return false;
+      }
+
+      if (Notification.permission === 'default') {
+        const result = await Notification.requestPermission();
+        if (result !== 'granted') {
+          toast.error('Notification permission denied');
+          return false;
+        }
+        await subscribeToPush();
+      } else if (Notification.permission === 'denied') {
+        toast.error('Notifications are blocked. Enable them in your browser settings.');
+        return false;
+      } else if (Notification.permission === 'granted') {
+        await subscribeToPush();
+      }
+    }
+
+    const success = await updatePreference('notifyPush', enabled);
+    if (success) setPushMaster(enabled);
+    return success;
+  }
+
+  async function handleEmailMasterToggle(enabled: boolean): Promise<boolean> {
+    const success = await updatePreference('notifyEmail', enabled);
+    if (success) setEmailMaster(enabled);
+    return success;
+  }
+
+  async function handleTypePrefToggle(
+    type: NotificationType,
+    channel: 'push' | 'email',
+    value: boolean
+  ) {
+    const prev = prefs[type][channel];
+    setPrefs((p) => ({
+      ...p,
+      [type]: { ...p[type], [channel]: value },
+    }));
+
+    const success = await updateNotificationPref(type, channel, value);
+    if (!success) {
+      setPrefs((p) => ({
+        ...p,
+        [type]: { ...p[type], [channel]: prev },
+      }));
+    }
+  }
+
+  async function handleReset() {
+    const success = await resetNotificationPrefs();
+    if (success) {
+      setPrefs({ ...DEFAULT_NOTIFICATION_PREFS });
+      toast.info('Notification preferences reset to defaults');
+    }
+  }
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -154,31 +282,34 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
 
       {/* Settings sections */}
       <div className="px-5 py-6 space-y-4">
+        {/* Notification Channels */}
         <div className="glass rounded-2xl p-5">
           <h3 className="text-base font-semibold text-text-secondary uppercase tracking-wider mb-4">
-            Notifications
+            Notification Channels
           </h3>
           <div className="space-y-4">
             <ToggleRow
               label="Push notifications"
-              description="Get notified when new tracks are added"
-              enabled={user.notifyPush === 1}
+              description="Browser & mobile push alerts"
+              enabled={pushMaster}
+              onChange={handlePushMasterToggle}
             />
 
             <div>
               <ToggleRow
                 label="Email notifications"
-                description="Receive email updates about your digs"
-                enabled={user.notifyEmail === 1}
+                description="Email updates about your Swaplists"
+                enabled={emailMaster}
+                onChange={handleEmailMasterToggle}
               />
 
-              {/* Email address management — inline under the toggle */}
+              {/* Email address management */}
               <div className="mt-3 ml-0.5 space-y-2">
                 {message && (
                   <div
                     className={
                       message.type === 'success'
-                        ? 'bg-spotify/10 border border-spotify/20 rounded-lg px-3 py-2 text-sm text-spotify'
+                        ? 'bg-brand/10 border border-brand/20 rounded-lg px-3 py-2 text-sm text-brand'
                         : 'bg-danger/10 border border-danger/20 rounded-lg px-3 py-2 text-sm text-danger'
                     }
                   >
@@ -186,7 +317,6 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                   </div>
                 )}
 
-                {/* Verified email */}
                 {user.email && !isEditing && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-text-tertiary">{user.email}</span>
@@ -196,14 +326,13 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                         setEmailInput('');
                         setMessage(null);
                       }}
-                      className="text-spotify hover:underline"
+                      className="text-brand hover:underline"
                     >
                       Change
                     </button>
                   </div>
                 )}
 
-                {/* Pending verification */}
                 {user.pendingEmail && !isEditing && (
                   <div className="flex items-center gap-2 text-sm flex-wrap">
                     <span className="text-amber-400">{user.pendingEmail}</span>
@@ -213,7 +342,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                     <button
                       onClick={handleResend}
                       disabled={isSaving}
-                      className="text-spotify hover:underline"
+                      className="text-brand hover:underline"
                     >
                       Resend
                     </button>
@@ -227,25 +356,23 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                   </div>
                 )}
 
-                {/* No email — prompt */}
                 {!user.email && !user.pendingEmail && !isEditing && (
                   <button
                     onClick={() => {
                       setIsEditing(true);
                       setMessage(null);
                     }}
-                    className="text-sm text-spotify hover:underline"
+                    className="text-sm text-brand hover:underline"
                   >
                     Add email address
                   </button>
                 )}
 
-                {/* Inline edit form */}
                 {isEditing && (
                   <form onSubmit={handleSubmit} className="flex items-center gap-2">
                     <input
                       type="email"
-                      className="input-glass flex-1 py-2! px-3! text-sm! rounded-lg!"
+                      className="input-glass input-glass-sm flex-1"
                       placeholder="your@email.com"
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
@@ -255,7 +382,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="btn-pill-primary py-2! px-4! text-sm! rounded-lg!"
+                      className="btn-pill-primary btn-pill-sm"
                     >
                       {isSaving ? '...' : 'Verify'}
                     </button>
@@ -276,14 +403,66 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
           </div>
         </div>
 
+        {/* Notification Types */}
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-text-secondary uppercase tracking-wider">
+              Notification Types
+            </h3>
+            <button
+              onClick={handleReset}
+              className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+            >
+              Reset defaults
+            </button>
+          </div>
+
+          {/* Column headers */}
+          <div className="flex items-center justify-end gap-3 mb-3 pr-0.5">
+            <span className="text-xs text-text-tertiary w-10 text-center">Push</span>
+            <span className="text-xs text-text-tertiary w-10 text-center">Email</span>
+          </div>
+
+          <div className="space-y-3">
+            {NOTIFICATION_TYPES.map((type) => (
+              <div key={type} className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary">
+                    {NOTIFICATION_TYPE_LABELS[type].label}
+                  </p>
+                  <p className="text-xs text-text-tertiary">
+                    {NOTIFICATION_TYPE_LABELS[type].description}
+                  </p>
+                </div>
+                <div className="flex gap-3 shrink-0">
+                  <MiniToggle
+                    enabled={prefs[type].push}
+                    disabled={!pushMaster}
+                    onChange={(v) => handleTypePrefToggle(type, 'push', v)}
+                    label={`${NOTIFICATION_TYPE_LABELS[type].label} push`}
+                  />
+                  <MiniToggle
+                    enabled={prefs[type].email}
+                    disabled={!emailMaster}
+                    onChange={(v) => handleTypePrefToggle(type, 'email', v)}
+                    label={`${NOTIFICATION_TYPE_LABELS[type].label} email`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Listening */}
         <div className="glass rounded-2xl p-5">
           <h3 className="text-base font-semibold text-text-secondary uppercase tracking-wider mb-4">
             Listening
           </h3>
           <ToggleRow
             label="Auto-reactions"
-            description="Automatically react based on listening behavior (skip = thumbs down, full listen = thumbs up)"
-            enabled={user.autoNegativeReactions === 1}
+            description="Automatically react based on behavior (skip = thumbs down, save to library = thumbs up)"
+            enabled={user.autoNegativeReactions}
+            onChange={(v) => updatePreference('autoNegativeReactions', v)}
           />
         </div>
 
@@ -309,12 +488,26 @@ function ToggleRow({
   label,
   description,
   enabled,
+  onChange,
 }: {
   label: string;
   description: string;
   enabled: boolean;
+  onChange?: (value: boolean) => Promise<boolean>;
 }) {
   const [isOn, setIsOn] = useState(enabled);
+
+  async function handleClick() {
+    const next = !isOn;
+    setIsOn(next);
+
+    if (onChange) {
+      const success = await onChange(next);
+      if (!success) {
+        setIsOn(!next);
+      }
+    }
+  }
 
   return (
     <div className="flex items-center justify-between gap-4">
@@ -323,9 +516,12 @@ function ToggleRow({
         <p className="text-sm text-text-tertiary mt-0.5">{description}</p>
       </div>
       <button
-        onClick={() => setIsOn(!isOn)}
-        className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${
-          isOn ? 'bg-spotify' : 'bg-white/10'
+        role="switch"
+        aria-checked={isOn}
+        aria-label={label}
+        onClick={handleClick}
+        className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${
+          isOn ? 'bg-brand' : 'bg-white/10'
         }`}
       >
         <div
@@ -335,5 +531,38 @@ function ToggleRow({
         />
       </button>
     </div>
+  );
+}
+
+function MiniToggle({
+  enabled,
+  disabled,
+  onChange,
+  label,
+}: {
+  enabled: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
+      aria-disabled={disabled}
+      onClick={() => {
+        if (!disabled) onChange(!enabled);
+      }}
+      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+        disabled ? 'bg-white/5 cursor-not-allowed' : enabled ? 'bg-brand' : 'bg-white/10'
+      }`}
+    >
+      <div
+        className={`absolute top-0.5 w-4 h-4 rounded-full shadow-sm transition-all duration-200 ${
+          disabled ? 'bg-white/20' : 'bg-white'
+        } ${enabled ? 'translate-x-[21px]' : 'translate-x-0.5'}`}
+      />
+    </button>
   );
 }

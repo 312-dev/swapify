@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -113,9 +114,10 @@ export default function EditDetailsModal({
         className="bg-[var(--surface-elevated)] border-white/[0.08] backdrop-blur-2xl sm:max-w-md"
       >
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-text-primary">
-            Edit details
-          </DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-text-primary">Edit details</DialogTitle>
+          <DialogDescription className="sr-only">
+            Update the name, description, and cover image for this Swaplist.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col sm:flex-row gap-5">
@@ -123,17 +125,13 @@ export default function EditDetailsModal({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="relative w-40 h-40 rounded-xl overflow-hidden flex-shrink-0 mx-auto sm:mx-0 group cursor-pointer"
+            className="relative w-40 h-40 rounded-xl overflow-hidden shrink-0 mx-auto sm:mx-0 group cursor-pointer"
           >
             {imagePreview ? (
-              <img
-                src={imagePreview}
-                alt="Cover"
-                className="w-full h-full object-cover"
-              />
+              <img src={imagePreview} alt="Cover" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-spotify/20 to-transparent">
-                <svg className="w-12 h-12 text-spotify/40" fill="currentColor" viewBox="0 0 24 24">
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand/20 to-transparent">
+                <svg className="w-12 h-12 text-brand/40" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                 </svg>
               </div>

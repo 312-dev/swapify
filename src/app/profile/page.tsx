@@ -26,6 +26,7 @@ export default async function ProfilePage() {
         pendingEmail: user.pendingEmail,
         notifyPush: user.notifyPush,
         notifyEmail: user.notifyEmail,
+        notificationPrefs: user.notificationPrefs ?? null,
         autoNegativeReactions: user.autoNegativeReactions,
       }}
       stats={{

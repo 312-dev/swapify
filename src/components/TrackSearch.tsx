@@ -129,11 +129,11 @@ export default function TrackSearch({ playlistId, onTrackAdded }: TrackSearchPro
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
           placeholder="Search for a track to add..."
-          className="w-full pl-10 pr-4 py-3 bg-glass border border-glass-border rounded-xl text-base text-text-primary placeholder:text-text-tertiary backdrop-blur-sm focus:outline-none focus:border-spotify transition-colors"
+          className="w-full pl-10 pr-4 py-3 bg-glass border border-glass-border rounded-xl text-base text-text-primary placeholder:text-text-tertiary backdrop-blur-sm focus:outline-none focus:border-brand transition-colors"
         />
         {isSearching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-4 h-4 border-2 border-text-tertiary border-t-spotify rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-text-tertiary border-t-brand rounded-full animate-spin" />
           </div>
         )}
       </div>

@@ -37,19 +37,19 @@ export default function MemberBadge({
           alt={displayName}
           className={`${sizeClasses[size]} rounded-full object-cover ${
             hasListened === false ? 'opacity-40 grayscale' : ''
-          } ${hasListened === true ? 'ring-2 ring-spotify' : ''}`}
+          } ${hasListened === true ? 'ring-2 ring-brand' : ''}`}
         />
       ) : (
         <div
           className={`${sizeClasses[size]} rounded-full bg-card flex items-center justify-center font-medium ${
             hasListened === false ? 'opacity-40' : ''
-          } ${hasListened === true ? 'ring-2 ring-spotify' : ''}`}
+          } ${hasListened === true ? 'ring-2 ring-brand' : ''}`}
         >
           {displayName[0]}
         </div>
       )}
       {hasListened === true && (
-        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-spotify rounded-full flex items-center justify-center">
+        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full flex items-center justify-center">
           <svg
             className="w-2 h-2 text-black"
             fill="none"

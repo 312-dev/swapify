@@ -9,6 +9,7 @@ interface ShareSheetProps {
   inviteCode: string;
   playlistId: string;
   playlistName: string;
+  ownerSpotifyClientId?: string;
 }
 
 export default function ShareSheet({
@@ -17,8 +18,10 @@ export default function ShareSheet({
   inviteCode,
   playlistId,
   playlistName,
+  ownerSpotifyClientId,
 }: ShareSheetProps) {
-  const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState<{
@@ -28,20 +31,26 @@ export default function ShareSheet({
 
   const inviteUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/playlist/join?code=${inviteCode}`
+      ? `${window.location.origin}/playlist/join?code=${inviteCode}${ownerSpotifyClientId ? `&cid=${ownerSpotifyClientId}` : ''}`
       : '';
+
+  function handleCopyCode() {
+    navigator.clipboard.writeText(inviteCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  }
 
   function handleCopyLink() {
     navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   }
 
   async function handleNativeShare() {
     try {
       await navigator.share({
         title: `Join "${playlistName}" on Swapify`,
-        text: `Check out this Swaplist — join and share music together!`,
+        text: `Join my Swaplist! Use code: ${inviteCode}`,
         url: inviteUrl,
       });
     } catch {
@@ -88,31 +97,32 @@ export default function ShareSheet({
   function handleClose() {
     setEmailStatus(null);
     setEmail('');
-    setCopied(false);
+    setCodeCopied(false);
+    setLinkCopied(false);
     onClose();
   }
 
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   return (
-    <GlassDrawer isOpen={isOpen} onClose={handleClose} title="Share" snapPoint="half">
+    <GlassDrawer isOpen={isOpen} onClose={handleClose} title="Invite Friends" snapPoint="half">
       <div className="space-y-5">
-        {/* Link section */}
+        {/* Invite code — front and center */}
         <div>
           <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2 block">
-            Invite link
+            Invite code
           </label>
-          <div className="flex gap-2">
-            <div className="flex-1 input-glass text-sm truncate !py-2.5 select-all">
-              {inviteUrl}
-            </div>
-            <button
-              onClick={handleCopyLink}
-              className="btn-pill-secondary text-xs! py-2! px-4! flex-shrink-0"
-            >
-              {copied ? (
+          <button
+            onClick={handleCopyCode}
+            className="w-full glass rounded-xl p-4 flex items-center justify-between gap-3 active:scale-[0.98] transition-transform"
+          >
+            <span className="text-2xl font-mono font-bold tracking-widest text-text-primary select-all">
+              {inviteCode}
+            </span>
+            <span className="shrink-0 text-sm text-text-secondary">
+              {codeCopied ? (
                 <svg
-                  className="w-4 h-4 text-spotify"
+                  className="w-5 h-5 text-brand"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -121,10 +131,13 @@ export default function ShareSheet({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                'Copy'
+                'Tap to copy'
               )}
-            </button>
-          </div>
+            </span>
+          </button>
+          <p className="text-xs text-text-tertiary mt-1.5">
+            Share this code so friends can join from the dashboard
+          </p>
         </div>
 
         {/* Native share (mobile) */}
@@ -153,8 +166,35 @@ export default function ShareSheet({
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-white/10" />
-          <span className="text-xs text-text-tertiary">or send via email</span>
+          <span className="text-xs text-text-tertiary">or share via link / email</span>
           <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Link section */}
+        <div>
+          <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2 block">
+            Invite link
+          </label>
+          <div className="flex gap-2">
+            <div className="flex-1 input-glass input-glass-sm text-sm truncate select-all">
+              {inviteUrl}
+            </div>
+            <button onClick={handleCopyLink} className="btn-pill-secondary btn-pill-sm shrink-0">
+              {linkCopied ? (
+                <svg
+                  className="w-4 h-4 text-brand"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                'Copy'
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Email invite */}
@@ -177,7 +217,7 @@ export default function ShareSheet({
             <button
               type="submit"
               disabled={sending || !email.trim()}
-              className="btn-pill-primary text-xs! py-2! px-4! flex-shrink-0 disabled:opacity-50"
+              className="btn-pill-primary btn-pill-sm shrink-0 disabled:opacity-50"
             >
               {sending ? 'Sending...' : 'Send'}
             </button>
@@ -185,7 +225,7 @@ export default function ShareSheet({
           {emailStatus && (
             <p
               className={`text-xs mt-2 ${
-                emailStatus.type === 'success' ? 'text-spotify' : 'text-red-400'
+                emailStatus.type === 'success' ? 'text-brand' : 'text-red-400'
               }`}
             >
               {emailStatus.message}

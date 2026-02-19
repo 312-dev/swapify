@@ -1,17 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { ImagePlus, Pencil } from 'lucide-react';
 import PlaylistCard from '@/components/PlaylistCard';
 import GlassDrawer from '@/components/ui/glass-drawer';
+import NotificationPrompt from '@/components/NotificationPrompt';
+
+function Spinner() {
+  return (
+    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
 
 interface PlaylistData {
   id: string;
   name: string;
   description: string | null;
   imageUrl: string | null;
+  vibeName: string | null;
   memberCount: number;
   activeTrackCount: number;
+  totalTrackCount: number;
+  likedTrackCount: number;
   unplayedCount: number;
   members: Array<{
     id: string;
@@ -23,6 +42,7 @@ interface PlaylistData {
 interface DashboardClientProps {
   playlists: PlaylistData[];
   userName: string;
+  notifyPush: boolean;
 }
 
 interface PlaylistPreview {
@@ -42,7 +62,7 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-export default function DashboardClient({ playlists }: DashboardClientProps) {
+export default function DashboardClient({ playlists, notifyPush }: DashboardClientProps) {
   const router = useRouter();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -51,44 +71,46 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
   // Create form state
   const [createName, setCreateName] = useState('');
   const [createDesc, setCreateDesc] = useState('');
+  const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const createFileInputRef = useRef<HTMLInputElement>(null);
 
   // Join form state
   const [joinCode, setJoinCode] = useState('');
   const [joinPreview, setJoinPreview] = useState<PlaylistPreview | null>(null);
   const [isLooking, setIsLooking] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setIsCreating(true);
-    setCreateError(null);
     try {
+      const body: Record<string, unknown> = {
+        name: createName.trim() || undefined,
+        description: createDesc.trim() || undefined,
+      };
+      if (createImagePreview?.startsWith('data:image/')) {
+        body.imageBase64 = createImagePreview.split(',')[1];
+      }
       const res = await fetch('/api/playlists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: createName.trim() || undefined,
-          description: createDesc.trim() || undefined,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Failed to create Swaplist');
       }
       const playlist = await res.json();
-      router.push(`/playlist/${playlist.id}`);
+      router.push(`/playlist/${playlist.id}?share=1`);
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Something went wrong');
+      toast.error(err instanceof Error ? err.message : 'Something went wrong');
       setIsCreating(false);
     }
   }
 
   async function lookupCode(inviteCode: string) {
     setIsLooking(true);
-    setJoinError(null);
     setJoinPreview(null);
 
     try {
@@ -100,7 +122,7 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
       const playlist = await res.json();
       setJoinPreview(playlist);
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : 'Invalid invite code');
+      toast.error(err instanceof Error ? err.message : 'Invalid invite code');
     } finally {
       setIsLooking(false);
     }
@@ -109,7 +131,6 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
   async function handleJoin() {
     if (!joinPreview) return;
     setIsJoining(true);
-    setJoinError(null);
 
     try {
       const res = await fetch(`/api/playlists/${joinPreview.id}/join`, {
@@ -125,7 +146,7 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
 
       router.push(`/playlist/${joinPreview.id}`);
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : 'Failed to join');
+      toast.error(err instanceof Error ? err.message : 'Failed to join');
       setIsJoining(false);
     }
   }
@@ -133,14 +154,25 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
   function resetCreateForm() {
     setCreateName('');
     setCreateDesc('');
-    setCreateError(null);
+    setCreateImagePreview(null);
     setIsCreating(false);
+  }
+
+  function handleCreateImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 256 * 1024) {
+      toast.error('Image must be under 256KB for Spotify');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setCreateImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
   }
 
   function resetJoinForm() {
     setJoinCode('');
     setJoinPreview(null);
-    setJoinError(null);
     setIsLooking(false);
     setIsJoining(false);
   }
@@ -155,7 +187,7 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="w-10 h-10 rounded-full bg-spotify flex items-center justify-center"
+          className="w-10 h-10 rounded-full bg-brand flex items-center justify-center"
           aria-label="Create a Swaplist"
         >
           <svg
@@ -197,6 +229,7 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
         </div>
       ) : (
         <div className="px-4 space-y-2">
+          <NotificationPrompt notifyPush={notifyPush} />
           {playlists.map((playlist) => (
             <PlaylistCard key={playlist.id} playlist={playlist} />
           ))}
@@ -213,30 +246,57 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
         title="Create a Swaplist"
         snapPoint="half"
       >
-        <form onSubmit={handleCreate} className="space-y-4">
-          <div>
-            <label
-              htmlFor="create-name"
-              className="block text-base font-medium text-text-secondary mb-2"
+        <form onSubmit={handleCreate} className="space-y-5">
+          {/* Cover photo + Name — side by side */}
+          <div className="flex items-start gap-4">
+            <button
+              type="button"
+              onClick={() => createFileInputRef.current?.click()}
+              className="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden group cursor-pointer"
             >
-              Name
-            </label>
-            <input
-              id="create-name"
-              type="text"
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-              placeholder="My Swaplist"
-              className="input-glass w-full"
-            />
-            <p className="text-sm text-text-tertiary mt-1.5">
-              Leave blank to auto-generate from member names
-            </p>
+              {createImagePreview ? (
+                <img src={createImagePreview} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-white/5 border border-dashed border-white/20 rounded-xl gap-1">
+                  <ImagePlus className="w-5 h-5 text-text-tertiary" />
+                  <span className="text-[10px] text-text-tertiary">Add photo</span>
+                </div>
+              )}
+              {createImagePreview && (
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                  <Pencil className="w-4 h-4 text-white" />
+                  <span className="text-[10px] font-medium text-white">Change</span>
+                </div>
+              )}
+              <input
+                ref={createFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                onChange={handleCreateImageSelect}
+                className="hidden"
+              />
+            </button>
+
+            <div className="flex-1 min-w-0 pt-1">
+              <input
+                id="create-name"
+                type="text"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="My Swaplist"
+                className="input-glass w-full"
+              />
+              <p className="text-xs text-text-tertiary mt-1.5">
+                Leave blank to auto-generate from member names
+              </p>
+            </div>
           </div>
+
+          {/* Description */}
           <div>
             <label
               htmlFor="create-desc"
-              className="block text-base font-medium text-text-secondary mb-2"
+              className="block text-sm font-medium text-text-secondary mb-1.5"
             >
               Description
             </label>
@@ -245,21 +305,23 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
               value={createDesc}
               onChange={(e) => setCreateDesc(e.target.value)}
               placeholder="What's this swaplist about?"
-              rows={3}
+              rows={2}
               className="input-glass w-full resize-none"
             />
           </div>
-          {createError && (
-            <div className="bg-danger/10 border border-danger/30 rounded-xl p-3 text-base text-danger">
-              {createError}
-            </div>
-          )}
+
           <button
             type="submit"
             disabled={isCreating}
             className="btn-pill btn-pill-primary w-full disabled:opacity-50"
           >
-            {isCreating ? 'Creating...' : 'Create Swaplist'}
+            {isCreating ? (
+              <>
+                <Spinner /> Creating...
+              </>
+            ) : (
+              'Create Swaplist'
+            )}
           </button>
         </form>
       </GlassDrawer>
@@ -297,15 +359,16 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
                   disabled={!joinCode.trim() || isLooking}
                   className="btn-pill btn-pill-primary disabled:opacity-50"
                 >
-                  {isLooking ? 'Looking...' : 'Find'}
+                  {isLooking ? (
+                    <>
+                      <Spinner /> Looking...
+                    </>
+                  ) : (
+                    'Find'
+                  )}
                 </button>
               </div>
             </div>
-            {joinError && (
-              <div className="bg-danger/10 border border-danger/30 rounded-xl p-3 text-base text-danger">
-                {joinError}
-              </div>
-            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -349,21 +412,20 @@ export default function DashboardClient({ playlists }: DashboardClientProps) {
                 disabled={isJoining}
                 className="btn-pill btn-pill-primary w-full disabled:opacity-50"
               >
-                {isJoining ? 'Joining...' : 'Join this Swaplist'}
+                {isJoining ? (
+                  <>
+                    <Spinner /> Joining...
+                  </>
+                ) : (
+                  'Join this Swaplist'
+                )}
               </button>
             </div>
-
-            {joinError && (
-              <div className="bg-danger/10 border border-danger/30 rounded-xl p-3 text-base text-danger">
-                {joinError}
-              </div>
-            )}
 
             <button
               onClick={() => {
                 setJoinPreview(null);
                 setJoinCode('');
-                setJoinError(null);
               }}
               className="text-base text-text-secondary hover:text-text-primary transition-colors"
             >

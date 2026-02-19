@@ -1,14 +1,22 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Epilogue, Geist_Mono, Montserrat } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import InstallPrompt from '@/components/InstallPrompt';
 import LayoutShell from '@/components/LayoutShell';
 import { Toaster } from '@/components/ui/sonner';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const epilogue = Epilogue({
+  variable: '--font-epilogue',
   subsets: ['latin'],
+});
+
+const calSans = localFont({
+  src: '../../node_modules/cal-sans/fonts/webfonts/CalSans-SemiBold.woff2',
+  variable: '--font-cal-sans',
+  weight: '600',
+  display: 'swap',
 });
 
 const geistMono = Geist_Mono({
@@ -16,9 +24,15 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const montserrat = Montserrat({
+  variable: '--font-montserrat',
+  subsets: ['latin'],
+  weight: ['600', '700'],
+});
+
 export const metadata: Metadata = {
   title: 'Swapify',
-  description: 'Collaborative playlists that clean themselves up',
+  description: 'A shared music inbox for you and your friends',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -28,7 +42,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#1DB954',
+  themeColor: '#38BDF8',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -46,7 +60,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen`}
+        className={`${epilogue.variable} ${calSans.variable} ${geistMono.variable} ${montserrat.variable} antialiased bg-background text-foreground min-h-screen`}
       >
         <ServiceWorkerRegister />
         <InstallPrompt />

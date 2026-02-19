@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { subscribeToPush } from '@/lib/push-client';
 
-export default function NotificationPrompt() {
+export default function NotificationPrompt({ notifyPush }: { notifyPush?: boolean }) {
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [dismissed, setDismissed] = useState(false);
 
@@ -29,28 +30,12 @@ export default function NotificationPrompt() {
 
     if (result === 'granted') {
       await subscribeToPush();
-    }
-  }
-
-  async function subscribeToPush() {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) return;
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
-      });
-
-      // Send subscription to server
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
+      // Also enable push in profile preferences
+      fetch('/api/profile/preferences', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription.toJSON()),
-      });
-    } catch (err) {
-      console.error('[Swapify] Push subscription failed:', err);
+        body: JSON.stringify({ notifyPush: true }),
+      }).catch(() => {});
     }
   }
 
@@ -59,8 +44,8 @@ export default function NotificationPrompt() {
     localStorage.setItem('swapify_notif_dismissed', '1');
   }
 
-  // Don't show if already granted, denied, unsupported, or dismissed
-  if (permission !== 'default' || dismissed) return null;
+  // Don't show if already granted, denied, unsupported, dismissed, or push already enabled in profile
+  if (permission !== 'default' || dismissed || notifyPush) return null;
 
   return (
     <div className="glass rounded-2xl p-5 flex items-center justify-between gap-3">
@@ -80,15 +65,4 @@ export default function NotificationPrompt() {
       </div>
     </div>
   );
-}
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
 }
