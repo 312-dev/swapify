@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { searchTracks } from '@/lib/spotify';
 
 // GET /api/spotify/search?q=...
 export async function GET(request: NextRequest) {
   const user = await requireAuth();
+
+  const limited = checkRateLimit(`search:${user.id}`, RATE_LIMITS.search);
+  if (limited) return limited;
+
   const query = request.nextUrl.searchParams.get('q');
 
   if (!query || query.trim().length === 0) {
     return NextResponse.json({ tracks: [] });
   }
 
-  const tracks = await searchTracks(user.id, query.trim(), 10);
+  const tracks = await searchTracks(user.id, query.trim());
 
   return NextResponse.json({
     tracks: tracks.map((t) => ({

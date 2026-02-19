@@ -6,8 +6,8 @@ export async function PUT(request: NextRequest) {
   const user = await requireAuth();
 
   const { trackUri, contextUri } = await request.json();
-  if (!trackUri || !contextUri) {
-    return NextResponse.json({ error: 'trackUri and contextUri are required' }, { status: 400 });
+  if (!trackUri) {
+    return NextResponse.json({ error: 'trackUri is required' }, { status: 400 });
   }
 
   const res = await startPlayback(user.id, { contextUri, trackUri });
@@ -31,5 +31,6 @@ export async function PUT(request: NextRequest) {
   }
 
   const text = await res.text().catch(() => '');
-  return NextResponse.json({ error: text || 'Failed to start playback.' }, { status: res.status });
+  console.error('Spotify playback failed:', res.status, text);
+  return NextResponse.json({ error: 'Playback failed. Please try again.' }, { status: res.status });
 }

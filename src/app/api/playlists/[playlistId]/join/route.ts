@@ -71,5 +71,19 @@ export async function POST(
     await db.update(playlists).set({ name: newName }).where(eq(playlists.id, playlistId));
   }
 
+  // Notify existing members that someone joined
+  import('@/lib/notifications').then(({ notifyPlaylistMembers }) => {
+    notifyPlaylistMembers(
+      playlistId,
+      user.id,
+      {
+        title: 'New member joined',
+        body: `${user.displayName} joined "${playlist.name}"`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
+      },
+      'memberJoined'
+    );
+  });
+
   return NextResponse.json({ success: true, playlistId });
 }

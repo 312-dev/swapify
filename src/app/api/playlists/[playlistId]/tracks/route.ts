@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { db } from '@/db';
 import {
   playlists,
@@ -9,7 +10,12 @@ import {
   trackReactions,
 } from '@/db/schema';
 import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
-import { addItemsToPlaylist, getPlaylistItems } from '@/lib/spotify';
+import {
+  addItemsToPlaylist,
+  getPlaylistItems,
+  checkSavedTracks,
+  isRateLimited,
+} from '@/lib/spotify';
 import { generateId } from '@/lib/utils';
 
 // GET /api/playlists/[playlistId]/tracks — tracks with listen progress + reactions
@@ -66,10 +72,7 @@ export async function GET(
 
   // Get removed tracks (previously played)
   const removedTracks = await db.query.playlistTracks.findMany({
-    where: and(
-      eq(playlistTracks.playlistId, playlistId),
-      isNotNull(playlistTracks.removedAt)
-    ),
+    where: and(eq(playlistTracks.playlistId, playlistId), isNotNull(playlistTracks.removedAt)),
     with: { addedBy: true },
     orderBy: playlistTracks.addedAt,
   });
@@ -93,6 +96,29 @@ export async function GET(
     avatarUrl: m.user.avatarUrl,
   }));
 
+  // Parse active playback for each member (for "now listening" indicators)
+  const PLAYBACK_FRESHNESS_MS = 90_000; // 90s = 3 poll cycles
+  const now = Date.now();
+  interface PlaybackInfo {
+    trackId: string;
+    progressMs: number;
+    durationMs: number;
+    capturedAt: number;
+  }
+  const memberPlayback = new Map<string, PlaybackInfo>(); // userId -> playback snapshot
+  for (const m of members) {
+    if (m.user.lastPlaybackJson) {
+      try {
+        const snap = JSON.parse(m.user.lastPlaybackJson) as PlaybackInfo;
+        if (snap.trackId && now - snap.capturedAt < PLAYBACK_FRESHNESS_MS) {
+          memberPlayback.set(m.user.id, snap);
+        }
+      } catch {
+        // Invalid JSON, skip
+      }
+    }
+  }
+
   const activeTracks = tracks.map((track) => {
     const requiredListeners = memberList.filter((m) => m.id !== track.addedByUserId);
     const trackListenRecords = listens.filter((l) => l.spotifyTrackId === track.spotifyTrackId);
@@ -100,10 +126,11 @@ export async function GET(
 
     const progress = requiredListeners.map((member) => {
       const listen = trackListenRecords.find((l) => l.userId === member.id);
+      const reaction = trackReactionRecords.find((r) => r.userId === member.id);
       return {
         ...member,
-        hasListened: !!listen,
-        listenedAt: listen?.listenedAt ?? null,
+        hasListened: !!listen || !!reaction,
+        listenedAt: listen?.listenedAt ?? reaction?.createdAt ?? null,
       };
     });
 
@@ -130,16 +157,59 @@ export async function GET(
         displayName: r.user.displayName,
         avatarUrl: r.user.avatarUrl,
         reaction: r.reaction,
-        isAuto: !!r.isAuto,
+        isAuto: r.isAuto,
         createdAt: r.createdAt,
       })),
+      activeListeners: memberList
+        .filter((m) => {
+          const snap = memberPlayback.get(m.id);
+          if (!snap || snap.trackId !== track.spotifyTrackId) return false;
+          // Estimate current position — stop showing if past track duration
+          const estimatedMs = snap.progressMs + (now - snap.capturedAt);
+          return estimatedMs < snap.durationMs;
+        })
+        .map((m) => {
+          const snap = memberPlayback.get(m.id)!;
+          return {
+            ...m,
+            progressMs: snap.progressMs,
+            durationMs: snap.durationMs,
+            capturedAt: snap.capturedAt,
+          };
+        }),
     };
   });
 
   // Previously played tracks
   const previousTracks = removedTracks.map((track) => ({
-      id: track.id,
+    id: track.id,
+    spotifyTrackId: track.spotifyTrackId,
+    trackName: track.trackName,
+    artistName: track.artistName,
+    albumImageUrl: track.albumImageUrl,
+    addedBy: {
+      id: track.addedBy.id,
+      displayName: track.addedBy.displayName,
+      avatarUrl: track.addedBy.avatarUrl,
+    },
+    addedAt: track.addedAt,
+    removedAt: track.removedAt,
+    archivedAt: track.archivedAt,
+  }));
+
+  // Liked tracks: all tracks where current user has thumbs_up reaction
+  const userLikedTrackIds = new Set(
+    reactions
+      .filter((r) => r.userId === user.id && r.reaction === 'thumbs_up')
+      .map((r) => r.spotifyTrackId)
+  );
+
+  const allDbTracks = [...tracks, ...removedTracks];
+  const likedTracks = allDbTracks
+    .filter((t) => userLikedTrackIds.has(t.spotifyTrackId))
+    .map((track) => ({
       spotifyTrackId: track.spotifyTrackId,
+      spotifyTrackUri: track.spotifyTrackUri,
       trackName: track.trackName,
       artistName: track.artistName,
       albumImageUrl: track.albumImageUrl,
@@ -150,13 +220,41 @@ export async function GET(
       },
       addedAt: track.addedAt,
       removedAt: track.removedAt,
-      archivedAt: track.archivedAt,
+      isActive: !track.removedAt,
     }));
+
+  // Outcast tracks: removed tracks where current user does NOT have thumbs_up
+  const outcastTracks = removedTracks
+    .filter((t) => !userLikedTrackIds.has(t.spotifyTrackId))
+    .map((track) => {
+      const userReaction = reactions.find(
+        (r) => r.userId === user.id && r.spotifyTrackId === track.spotifyTrackId
+      );
+      return {
+        spotifyTrackId: track.spotifyTrackId,
+        spotifyTrackUri: track.spotifyTrackUri,
+        trackName: track.trackName,
+        artistName: track.artistName,
+        albumImageUrl: track.albumImageUrl,
+        addedBy: {
+          id: track.addedBy.id,
+          displayName: track.addedBy.displayName,
+          avatarUrl: track.addedBy.avatarUrl,
+        },
+        addedAt: track.addedAt,
+        removedAt: track.removedAt,
+        reaction: userReaction?.reaction ?? null,
+      };
+    });
 
   return NextResponse.json({
     tracks: activeTracks,
     previousTracks,
     members: memberList,
+    likedTracks,
+    outcastTracks,
+    likedPlaylistId: membership.likedPlaylistId ?? null,
+    vibeName: playlist?.vibeName ?? null,
   });
 }
 
@@ -166,6 +264,10 @@ export async function POST(
   { params }: { params: Promise<{ playlistId: string }> }
 ) {
   const user = await requireAuth();
+
+  const limited = checkRateLimit(`mutation:${user.id}`, RATE_LIMITS.mutation);
+  if (limited) return limited;
+
   const { playlistId } = await params;
 
   const membership = await db.query.playlistMembers.findFirst({
@@ -241,7 +343,7 @@ export async function POST(
   } catch (err) {
     console.error('Spotify addItemsToPlaylist failed:', err);
     return NextResponse.json(
-      { error: `Spotify error: ${err instanceof Error ? err.message : 'unknown'}` },
+      { error: 'Unable to add track to playlist. Please try again.' },
       { status: 502 }
     );
   }
@@ -263,17 +365,48 @@ export async function POST(
 
   // Notify other members
   import('@/lib/notifications').then(({ notifyPlaylistMembers }) => {
-    notifyPlaylistMembers(playlistId, user.id, {
-      title: 'New track added',
-      body: `${user.displayName} added "${trackName}" by ${artistName}`,
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
-    });
+    notifyPlaylistMembers(
+      playlistId,
+      user.id,
+      {
+        title: 'New track added',
+        body: `${user.displayName} added "${trackName}" by ${artistName}`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
+      },
+      'newTrack'
+    );
   });
 
   // Auto-sort playlist by vibe (fire-and-forget)
   import('@/lib/vibe-sort').then(({ vibeSort }) => {
     vibeSort(playlistId).catch(() => {});
   });
+
+  // Auto-like: check if other members already have this track saved in their library
+  (async () => {
+    try {
+      const { setAutoReaction } = await import('@/lib/polling');
+      const otherMembers = (
+        await db.query.playlistMembers.findMany({
+          where: eq(playlistMembers.playlistId, playlistId),
+        })
+      ).filter((m) => m.userId !== user.id);
+
+      for (const member of otherMembers) {
+        if (isRateLimited()) break;
+        try {
+          const [isSaved] = await checkSavedTracks(member.userId, [spotifyTrackId]);
+          if (isSaved) {
+            await setAutoReaction(playlistId, spotifyTrackId, member.userId, 'thumbs_up');
+          }
+        } catch {
+          // Token expired or rate limited — skip this member
+        }
+      }
+    } catch (err) {
+      console.error('[Swapify] Auto-like library check failed:', err);
+    }
+  })();
 
   return NextResponse.json({ id: trackId, success: true });
 }
