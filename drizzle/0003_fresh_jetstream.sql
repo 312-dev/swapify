@@ -1,0 +1,1 @@
+ALTER TABLE `jams` ADD `max_tracks_per_user` integer;

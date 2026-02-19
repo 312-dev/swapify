@@ -1,0 +1,1 @@
+ALTER TABLE `jams` ADD `max_track_age_days` integer DEFAULT 7 NOT NULL;
