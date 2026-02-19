@@ -674,7 +674,7 @@ export default function LandingClient() {
       <footer className="border-t border-glass-border">
         <div className="max-w-5xl mx-auto px-5 py-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           {/* Left — copyright + company */}
-          <p className="text-xs text-text-secondary/70">
+          <p className="text-xs text-text-secondary/70" suppressHydrationWarning>
             &copy; {new Date().getFullYear()}{' '}
             <a
               href="https://312.dev"

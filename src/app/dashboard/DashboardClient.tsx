@@ -125,6 +125,10 @@ export default function DashboardClient({
   syncCircleId,
 }: DashboardClientProps) {
   const router = useRouter();
+  const [greeting, setGreeting] = useState('');
+  useEffect(() => {
+    setGreeting(getGreeting());
+  }, []);
 
   // Persist auto-defaulted circle to session on mount
   useEffect(() => {
@@ -199,7 +203,7 @@ export default function DashboardClient({
     return (
       <div className="min-h-screen flex flex-col">
         <header className="px-5 pt-6 pb-4">
-          <p className="text-base text-text-secondary">{getGreeting()},</p>
+          <p className="text-base text-text-secondary">{greeting},</p>
           <h1 className="text-3xl font-bold text-text-primary mt-1">Welcome to Swapify</h1>
         </header>
 
@@ -242,7 +246,7 @@ export default function DashboardClient({
       {/* Header */}
       <header className="px-5 pt-2 pb-4 flex items-start justify-between">
         <div>
-          <p className="text-base text-text-secondary">{getGreeting()},</p>
+          <p className="text-base text-text-secondary">{greeting},</p>
           <h1 className="text-3xl font-bold text-text-primary mt-1">Your Swaplists</h1>
         </div>
         <button

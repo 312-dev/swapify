@@ -21,11 +21,14 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first, fall back to cache
+// Fetch: network-first, fall back to cache (same-origin only)
 self.addEventListener("fetch", (event) => {
   // Skip non-GET requests and API calls
   if (event.request.method !== "GET") return;
   if (event.request.url.includes("/api/")) return;
+
+  // Skip cross-origin requests (Spotify CDN images, etc.)
+  if (!event.request.url.startsWith(self.location.origin)) return;
 
   event.respondWith(
     fetch(event.request)
@@ -39,7 +42,9 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() =>
+        caches.match(event.request).then((cached) => cached || new Response("Offline", { status: 503 }))
+      )
   );
 });
 

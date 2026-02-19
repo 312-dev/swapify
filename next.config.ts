@@ -17,10 +17,10 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com https://wrapped-images.spotifycdn.com blob:",
-              "connect-src 'self' https://api.spotify.com https://accounts.spotify.com",
+              "connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com https://wrapped-images.spotifycdn.com",
               "font-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
