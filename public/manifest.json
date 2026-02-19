@@ -1,13 +1,13 @@
 {
   "name": "Swapify",
   "short_name": "Swapify",
-  "description": "Collaborative playlists that clean themselves up",
+  "description": "A shared music inbox for you and your friends",
   "id": "/dashboard",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
-  "theme_color": "#1DB954",
+  "theme_color": "#38BDF8",
   "orientation": "portrait-primary",
   "icons": [
     {
