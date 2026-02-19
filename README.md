@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Swapify
+
+Collaborative Spotify playlists with reactions — share music with friends through **Swaplists**.
+
+Each member adds tracks, swipes to react (thumbs up / thumbs down), and the playlist syncs back to Spotify. Built as a mobile-first PWA.
+
+## Features
+
+- **Swaplists** — create or join collaborative playlists linked to Spotify
+- **Swipe reactions** — swipe right to vibe, swipe left to skip
+- **Vibe sort** — reorder tracks by collective reaction score
+- **Real-time sync** — tracks stay in sync with the Spotify playlist
+- **Push notifications** — get notified when friends add tracks or react
+- **Email invites** — invite members by email with verification
+- **Installable PWA** — add to home screen, works offline-capable
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org) 16 (App Router, Turbopack)
+- TypeScript, Tailwind CSS v4, [shadcn/ui](https://ui.shadcn.com)
+- [Motion](https://motion.dev) (Framer Motion v11+) for gestures and animations
+- [Drizzle ORM](https://orm.drizzle.team) + SQLite (better-sqlite3)
+- Spotify OAuth PKCE (no NextAuth)
+- [iron-session](https://github.com/vvo/iron-session) for cookie sessions
+- [Resend](https://resend.com) for transactional email
+- Web Push (VAPID) for notifications
+- Deployed on [Fly.io](https://fly.io) with Docker
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20+
+- A [Spotify Developer](https://developer.spotify.com/dashboard) app with a redirect URI set to `http://127.0.0.1:3000/api/auth/callback`
+
+### Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Copy environment template and fill in your values
+cp .env.example .env.local
+
+# Initialize the database
+npm run db:seed
+
+# Start the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000) to log in with Spotify.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See [`.env.example`](.env.example) for all required variables. At minimum you need:
 
-## Learn More
+| Variable | Description |
+|---|---|
+| `SPOTIFY_CLIENT_ID` | From your Spotify Developer app |
+| `IRON_SESSION_PASSWORD` | Random string, min 32 characters |
 
-To learn more about Next.js, take a look at the following resources:
+Optional for full functionality: `RESEND_API_KEY` (email invites), `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push notifications).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Generate VAPID keys with:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npx web-push generate-vapid-keys
+```
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Command | Description |
+|---|---|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint |
+| `npm run format` | Prettier |
+| `npm run type-check` | TypeScript check |
+| `npm run db:seed` | Seed database with sample data |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
