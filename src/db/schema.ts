@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, uniqueIndex, boolean, timestamp } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ─── Users ───────────────────────────────────────────────────────────────────
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
   id: text('id').primaryKey(),
   spotifyId: text('spotify_id').notNull().unique(),
   displayName: text('display_name').notNull(),
@@ -11,22 +11,22 @@ export const users = sqliteTable('users', {
   pendingEmail: text('pending_email'),
   emailVerifyToken: text('email_verify_token'),
   emailVerifyExpiresAt: integer('email_verify_expires_at'),
-  notifyPush: integer('notify_push').notNull().default(1),
-  notifyEmail: integer('notify_email').notNull().default(0),
-  autoNegativeReactions: integer('auto_negative_reactions').notNull().default(1),
+  notifyPush: boolean('notify_push').notNull().default(true),
+  notifyEmail: boolean('notify_email').notNull().default(false),
+  notificationPrefs: text('notification_prefs'), // JSON: per-type channel prefs
+  autoNegativeReactions: boolean('auto_negative_reactions').notNull().default(true),
   recentEmojis: text('recent_emojis'), // JSON array of last 3 custom emojis used
+  spotifyClientId: text('spotify_client_id'), // Spotify app client ID used to auth this user
   accessToken: text('access_token').notNull(),
   refreshToken: text('refresh_token').notNull(),
   tokenExpiresAt: integer('token_expires_at').notNull(),
   lastPollCursor: integer('last_poll_cursor'),
   lastPlaybackJson: text('last_playback_json'), // JSON: { trackId, progressMs, durationMs, capturedAt }
-  createdAt: integer('created_at', { mode: 'timestamp' })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ─── Playlists ──────────────────────────────────────────────────────────────
-export const playlists = sqliteTable('playlists', {
+export const playlists = pgTable('playlists', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
@@ -41,13 +41,12 @@ export const playlists = sqliteTable('playlists', {
   maxTracksPerUser: integer('max_tracks_per_user'),
   maxTrackAgeDays: integer('max_track_age_days').notNull().default(7),
   removalDelay: text('removal_delay').notNull().default('immediate'),
-  createdAt: integer('created_at', { mode: 'timestamp' })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  vibeName: text('vibe_name'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ─── Playlist Members ───────────────────────────────────────────────────────
-export const playlistMembers = sqliteTable(
+export const playlistMembers = pgTable(
   'playlist_members',
   {
     id: text('id').primaryKey(),
@@ -57,15 +56,14 @@ export const playlistMembers = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    joinedAt: integer('joined_at', { mode: 'timestamp' })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    likedPlaylistId: text('liked_playlist_id'),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('playlist_members_playlist_user_idx').on(table.playlistId, table.userId)]
 );
 
 // ─── Playlist Tracks ────────────────────────────────────────────────────────
-export const playlistTracks = sqliteTable(
+export const playlistTracks = pgTable(
   'playlist_tracks',
   {
     id: text('id').primaryKey(),
@@ -82,12 +80,10 @@ export const playlistTracks = sqliteTable(
     addedByUserId: text('added_by_user_id')
       .notNull()
       .references(() => users.id),
-    addedAt: integer('added_at', { mode: 'timestamp' })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    removedAt: integer('removed_at', { mode: 'timestamp' }),
-    archivedAt: integer('archived_at', { mode: 'timestamp' }),
-    completedAt: integer('completed_at', { mode: 'timestamp' }),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (table) => [
     uniqueIndex('playlist_tracks_playlist_uri_idx').on(table.playlistId, table.spotifyTrackUri),
@@ -95,7 +91,7 @@ export const playlistTracks = sqliteTable(
 );
 
 // ─── Track Listens ───────────────────────────────────────────────────────────
-export const trackListens = sqliteTable(
+export const trackListens = pgTable(
   'track_listens',
   {
     id: text('id').primaryKey(),
@@ -106,9 +102,9 @@ export const trackListens = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    listenedAt: integer('listened_at', { mode: 'timestamp' }).notNull(),
+    listenedAt: timestamp('listened_at', { withTimezone: true }).notNull(),
     listenDurationMs: integer('listen_duration_ms'),
-    wasSkipped: integer('was_skipped').notNull().default(0),
+    wasSkipped: boolean('was_skipped').notNull().default(false),
   },
   (table) => [
     uniqueIndex('track_listens_playlist_track_user_idx').on(
@@ -120,7 +116,7 @@ export const trackListens = sqliteTable(
 );
 
 // ─── Track Reactions ─────────────────────────────────────────────────────────
-export const trackReactions = sqliteTable(
+export const trackReactions = pgTable(
   'track_reactions',
   {
     id: text('id').primaryKey(),
@@ -132,10 +128,8 @@ export const trackReactions = sqliteTable(
       .notNull()
       .references(() => users.id),
     reaction: text('reaction').notNull(), // "thumbs_up", "thumbs_down", "fire", "heart", etc.
-    isAuto: integer('is_auto').notNull().default(0), // 1 if auto-generated (save/skip detection)
-    createdAt: integer('created_at', { mode: 'timestamp' })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    isAuto: boolean('is_auto').notNull().default(false), // true if auto-generated (save/skip detection)
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('track_reactions_playlist_track_user_idx').on(
@@ -147,7 +141,7 @@ export const trackReactions = sqliteTable(
 );
 
 // ─── Email Invites ──────────────────────────────────────────────────────────
-export const emailInvites = sqliteTable(
+export const emailInvites = pgTable(
   'email_invites',
   {
     id: text('id').primaryKey(),
@@ -158,9 +152,7 @@ export const emailInvites = sqliteTable(
       .notNull()
       .references(() => users.id),
     recipientEmail: text('recipient_email').notNull(),
-    sentAt: integer('sent_at', { mode: 'timestamp' })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('email_invites_playlist_email_idx').on(table.playlistId, table.recipientEmail),
@@ -168,7 +160,7 @@ export const emailInvites = sqliteTable(
 );
 
 // ─── Push Subscriptions ──────────────────────────────────────────────────────
-export const pushSubscriptions = sqliteTable(
+export const pushSubscriptions = pgTable(
   'push_subscriptions',
   {
     id: text('id').primaryKey(),
@@ -178,9 +170,7 @@ export const pushSubscriptions = sqliteTable(
     endpoint: text('endpoint').notNull(),
     p256dh: text('p256dh').notNull(),
     auth: text('auth').notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('push_sub_user_endpoint_idx').on(table.userId, table.endpoint)]
 );

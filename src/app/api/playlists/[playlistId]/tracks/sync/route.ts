@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers, playlistTracks } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { getPlaylistItems } from '@/lib/spotify';
+import { getPlaylistItems, getPlaylistDetails } from '@/lib/spotify';
 import { generateId } from '@/lib/utils';
 
 // POST /api/playlists/[playlistId]/tracks/sync — sync playlist items from Spotify
@@ -29,8 +29,30 @@ export async function POST(
     return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
   }
 
-  // Fetch current playlist items from Spotify
-  const spotifyItems = await getPlaylistItems(playlist.ownerId, playlist.spotifyPlaylistId);
+  // Fetch playlist metadata + items from Spotify in parallel
+  const [spotifyDetails, spotifyItems] = await Promise.all([
+    getPlaylistDetails(playlist.ownerId, playlist.spotifyPlaylistId),
+    getPlaylistItems(playlist.ownerId, playlist.spotifyPlaylistId),
+  ]);
+
+  // Check if metadata changed on Spotify and update local DB
+  const metadataChanges: { name?: string; description?: string | null; imageUrl?: string | null } =
+    {};
+
+  if (spotifyDetails.name !== playlist.name) {
+    metadataChanges.name = spotifyDetails.name;
+  }
+  if (spotifyDetails.description !== playlist.description) {
+    metadataChanges.description = spotifyDetails.description;
+  }
+  // Always prefer Spotify's CDN URL over a local data URL
+  if (spotifyDetails.imageUrl && spotifyDetails.imageUrl !== playlist.imageUrl) {
+    metadataChanges.imageUrl = spotifyDetails.imageUrl;
+  }
+
+  if (Object.keys(metadataChanges).length > 0) {
+    await db.update(playlists).set(metadataChanges).where(eq(playlists.id, playlistId));
+  }
 
   // Get our active tracks
   const localTracks = await db.query.playlistTracks.findMany({
@@ -77,12 +99,16 @@ export async function POST(
     }
   }
 
-  // Auto-sort playlist by vibe if new tracks were added (fire-and-forget)
-  if (added > 0) {
+  // Auto-sort playlist by vibe if tracks changed (fire-and-forget)
+  if (added > 0 || removed > 0) {
     import('@/lib/vibe-sort').then(({ vibeSort }) => {
       vibeSort(playlistId).catch(() => {});
     });
   }
 
-  return NextResponse.json({ added, removed });
+  return NextResponse.json({
+    added,
+    removed,
+    ...(Object.keys(metadataChanges).length > 0 && { metadata: metadataChanges }),
+  });
 }

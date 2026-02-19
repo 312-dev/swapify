@@ -16,7 +16,7 @@ const Toaster = (props: ToasterProps) => {
           '--normal-border': 'var(--glass-border)',
           '--border-radius': '12px',
           '--success-bg': 'var(--surface-elevated)',
-          '--success-text': 'var(--spotify-green)',
+          '--success-text': 'var(--brand)',
           '--success-border': 'var(--glass-border)',
           '--error-bg': 'var(--surface-elevated)',
           '--error-text': 'var(--danger)',

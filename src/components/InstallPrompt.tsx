@@ -68,7 +68,7 @@ export default function InstallPrompt() {
             >
               Not now
             </button>
-            <button onClick={handleInstall} className="btn-pill-primary !text-sm !px-4 !py-1.5">
+            <button onClick={handleInstall} className="btn-pill-primary btn-pill-sm">
               Install
             </button>
           </div>

@@ -3,11 +3,14 @@ import { cookies } from 'next/headers';
 import { getIronSession } from 'iron-session';
 import { SessionData, sessionOptions } from '@/lib/session';
 import { getSpotifyProfile } from '@/lib/spotify';
+import { encrypt } from '@/lib/crypto';
 import { db } from '@/db';
 import { users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { generateId } from '@/lib/utils';
 import type { SpotifyTokenResponse } from '@/types/spotify';
+import { logger } from '@/lib/logger';
+import { spotifyConfig } from '@/lib/spotify-config';
 
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.url;
@@ -25,6 +28,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=no_verifier', baseUrl));
   }
 
+  if (!session.spotifyClientId) {
+    return NextResponse.redirect(new URL('/login?error=no_client_id', baseUrl));
+  }
+
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`;
+
   // Exchange code for tokens
   const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -32,15 +41,15 @@ export async function GET(request: NextRequest) {
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
-      client_id: process.env.SPOTIFY_CLIENT_ID!,
+      redirect_uri: redirectUri,
+      client_id: session.spotifyClientId,
       code_verifier: session.codeVerifier,
     }),
   });
 
   if (!tokenRes.ok) {
     const err = await tokenRes.text();
-    console.error('Token exchange failed:', err);
+    logger.error(`Token exchange failed: ${err}`);
     return NextResponse.redirect(new URL('/login?error=token_exchange', baseUrl));
   }
 
@@ -55,6 +64,16 @@ export async function GET(request: NextRequest) {
     where: eq(users.spotifyId, profile.id),
   });
 
+  // Enforce dev mode user cap (Spotify allows max 5 users in dev mode)
+  if (spotifyConfig.devMode && !existingUser) {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(users);
+    const userCount = result[0]?.count ?? 0;
+    if (userCount >= spotifyConfig.maxUsers) {
+      logger.warn(`[Swapify] Dev mode user limit reached (${userCount}/${spotifyConfig.maxUsers})`);
+      return NextResponse.redirect(new URL('/login?error=dev_mode_user_limit', baseUrl));
+    }
+  }
+
   let userId: string;
   if (existingUser) {
     userId = existingUser.id;
@@ -63,9 +82,12 @@ export async function GET(request: NextRequest) {
       .set({
         displayName: profile.display_name,
         avatarUrl: avatarUrl,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token ?? existingUser.refreshToken,
+        accessToken: encrypt(tokenData.access_token),
+        refreshToken: tokenData.refresh_token
+          ? encrypt(tokenData.refresh_token)
+          : existingUser.refreshToken,
         tokenExpiresAt: Math.floor(Date.now() / 1000) + tokenData.expires_in,
+        spotifyClientId: session.spotifyClientId,
       })
       .where(eq(users.id, userId));
   } else {
@@ -75,9 +97,10 @@ export async function GET(request: NextRequest) {
       spotifyId: profile.id,
       displayName: profile.display_name,
       avatarUrl: avatarUrl,
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token!,
+      accessToken: encrypt(tokenData.access_token),
+      refreshToken: encrypt(tokenData.refresh_token!),
       tokenExpiresAt: Math.floor(Date.now() / 1000) + tokenData.expires_in,
+      spotifyClientId: session.spotifyClientId,
     });
   }
 
@@ -88,6 +111,7 @@ export async function GET(request: NextRequest) {
   session.displayName = profile.display_name;
   session.avatarUrl = avatarUrl ?? undefined;
   session.codeVerifier = undefined;
+  session.spotifyClientId = undefined;
   session.returnTo = undefined;
   await session.save();
 

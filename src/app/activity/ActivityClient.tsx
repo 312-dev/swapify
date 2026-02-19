@@ -133,10 +133,10 @@ export default function ActivityClient() {
                         <img
                           src={event.user.avatarUrl}
                           alt={event.user.displayName}
-                          className="w-10 h-10 rounded-full flex-shrink-0"
+                          className="w-10 h-10 rounded-full shrink-0"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-base text-text-secondary flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-base text-text-secondary shrink-0">
                           {event.user.displayName[0]}
                         </div>
                       )}
@@ -159,7 +159,7 @@ export default function ActivityClient() {
                         <AlbumArt
                           src={event.data.albumImageUrl}
                           alt=""
-                          className="w-10 h-10 rounded-lg flex-shrink-0"
+                          className="w-10 h-10 rounded-lg shrink-0"
                         />
                       )}
                     </Link>

@@ -23,6 +23,7 @@ interface ReactionOverlayProps {
   onClose: () => void;
   currentReaction?: string | null;
   anchorRef: React.RefObject<HTMLElement | null>;
+  tapPosition?: { x: number; y: number } | null;
 }
 
 export default function ReactionOverlay({
@@ -31,24 +32,28 @@ export default function ReactionOverlay({
   onClose,
   currentReaction,
   anchorRef,
+  tapPosition,
 }: ReactionOverlayProps) {
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [anchorRect, setAnchorRect] = useState<{ top: number; left: number } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
-  // Compute position from anchor ref and reset expanded state
+  // Measure anchor element position when overlay opens (DOM read = external system)
   useEffect(() => {
     if (!isOpen) {
-      setShowPicker(false);
       return;
     }
-    if (!anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    setPosition({
-      top: rect.top - 8,
-      left: rect.left + rect.width / 2,
-    });
-  }, [isOpen, anchorRef]);
+    if (!tapPosition && anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setAnchorRect({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    }
+    return () => setShowPicker(false);
+  }, [isOpen, anchorRef, tapPosition]);
+
+  // Derive position from props (tap) or measured anchor rect
+  const position = tapPosition
+    ? { top: tapPosition.y - 8, left: tapPosition.x }
+    : (anchorRect ?? { top: 0, left: 0 });
 
   // Dismiss on scroll
   useEffect(() => {
@@ -106,7 +111,9 @@ export default function ReactionOverlay({
                       onClose();
                     }}
                     className={`text-2xl p-1.5 rounded-xl transition-all hover:bg-white/10 active:scale-90 ${
-                      currentReaction === r.value ? 'bg-white/15 ring-1 ring-white/20 scale-110' : ''
+                      currentReaction === r.value
+                        ? 'bg-white/15 ring-1 ring-white/20 scale-110'
+                        : ''
                     }`}
                   >
                     {r.emoji}

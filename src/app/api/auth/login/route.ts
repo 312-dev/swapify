@@ -23,19 +23,27 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 
 export async function GET(request: NextRequest) {
   const returnTo = request.nextUrl.searchParams.get('returnTo');
+  const clientId = request.nextUrl.searchParams.get('clientId') ?? process.env.SPOTIFY_CLIENT_ID;
+
+  if (!clientId) {
+    return NextResponse.redirect(new URL('/login?error=no_client_id', request.url));
+  }
+
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`;
 
   const codeVerifier = generateRandomString(64);
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const state = generateRandomString(16);
 
-  // Store code verifier in session
   const cookieStore = await cookies();
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
   session.codeVerifier = codeVerifier;
+  session.spotifyClientId = clientId;
   if (returnTo) session.returnTo = returnTo;
   await session.save();
 
   const scopes = [
+    'user-read-private',
     'user-read-recently-played',
     'playlist-read-private',
     'playlist-read-collaborative',
@@ -50,9 +58,9 @@ export async function GET(request: NextRequest) {
 
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: process.env.SPOTIFY_CLIENT_ID!,
+    client_id: clientId,
     scope: scopes,
-    redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
+    redirect_uri: redirectUri,
     state,
     code_challenge_method: 'S256',
     code_challenge: codeChallenge,

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { MessageCircleHeart } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils';
 import AlbumArt from '@/components/AlbumArt';
+import NowPlayingIndicator, { type ActiveListener } from '@/components/NowPlayingIndicator';
 
 interface TrackCardProps {
   track: {
@@ -37,16 +39,28 @@ interface TrackCardProps {
       createdAt: string;
     }>;
   };
+  activeListeners?: ActiveListener[];
   playlistId: string;
   currentUserId: string;
   spotifyTrackUri: string;
   spotifyPlaylistUri: string;
 }
 
-export default function TrackCard({ track, spotifyTrackUri, spotifyPlaylistUri }: TrackCardProps) {
+export default function TrackCard({
+  track,
+  activeListeners = [],
+  currentUserId,
+  spotifyTrackUri,
+  spotifyPlaylistUri,
+}: TrackCardProps) {
   const isComplete = track.listenedCount >= track.totalRequired && track.totalRequired > 0;
   const [playState, setPlayState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [playError, setPlayError] = useState<string | null>(null);
+
+  // Track is pending the current user's reaction if they didn't add it and haven't reacted yet
+  const isOwnTrack = track.addedBy.id === currentUserId;
+  const hasReacted = track.reactions.some((r) => r.userId === currentUserId);
+  const isPendingReaction = !isOwnTrack && !hasReacted && !isComplete;
 
   async function handlePlay() {
     setPlayState('loading');
@@ -127,7 +141,29 @@ export default function TrackCard({ track, spotifyTrackUri, spotifyPlaylistUri }
 
       {/* Track info */}
       <div className="flex-1 min-w-0">
-        <p className="text-base font-semibold truncate text-text-primary">{track.trackName}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-base font-semibold truncate text-text-primary">{track.trackName}</p>
+          {/* Inline reaction summary */}
+          {Object.keys(reactionSummary).length > 0 && (
+            <div className="flex items-center gap-0.5 text-xs shrink-0">
+              {Object.entries(reactionSummary)
+                .slice(0, 2)
+                .map(([emoji, count]) => (
+                  <span key={emoji} className="flex items-center">
+                    <span>{emoji}</span>
+                    {count > 1 && <span className="text-text-tertiary ml-0.5">{count}</span>}
+                  </span>
+                ))}
+            </div>
+          )}
+          {/* Pending reaction indicator */}
+          {isPendingReaction && (
+            <MessageCircleHeart
+              className="w-4 h-4 shrink-0 text-brand pending-reaction-pulse"
+              data-tooltip="Double-tap to react"
+            />
+          )}
+        </div>
         <p className="text-sm text-text-secondary truncate">
           {track.artistName}
           <span className="text-text-tertiary">
@@ -136,24 +172,15 @@ export default function TrackCard({ track, spotifyTrackUri, spotifyPlaylistUri }
           </span>
         </p>
         {playError && <p className="text-sm text-danger mt-0.5">{playError}</p>}
-      </div>
-
-      {/* Right side: reaction summary + avatar + progress ring */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Inline reaction summary */}
-        {Object.keys(reactionSummary).length > 0 && (
-          <div className="flex items-center gap-0.5 text-xs">
-            {Object.entries(reactionSummary)
-              .slice(0, 2)
-              .map(([emoji, count]) => (
-                <span key={emoji} className="flex items-center">
-                  <span>{emoji}</span>
-                  {count > 1 && <span className="text-text-tertiary ml-0.5">{count}</span>}
-                </span>
-              ))}
+        {activeListeners.length > 0 && (
+          <div className="mt-0.5">
+            <NowPlayingIndicator listeners={activeListeners} />
           </div>
         )}
+      </div>
 
+      {/* Right side: avatar + progress ring */}
+      <div className="flex items-center gap-2 shrink-0">
         {/* Added by avatar */}
         <div data-tooltip={track.addedBy.displayName}>
           {track.addedBy.avatarUrl ? (
@@ -191,12 +218,12 @@ export default function TrackCard({ track, spotifyTrackUri, spotifyPlaylistUri }
               strokeDasharray={`${2 * Math.PI * 13}`}
               strokeDashoffset={`${2 * Math.PI * 13 * (1 - percentage / 100)}`}
               strokeLinecap="round"
-              className={isComplete ? 'text-spotify' : 'text-spotify/60'}
+              className={isComplete ? 'text-brand' : 'text-brand/60'}
               style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
             />
           </svg>
           <span
-            className={`absolute inset-0 flex items-center justify-center text-[9px] font-semibold ${isComplete ? 'text-spotify' : 'text-text-tertiary'}`}
+            className={`absolute inset-0 flex items-center justify-center text-[9px] font-semibold ${isComplete ? 'text-brand' : 'text-text-tertiary'}`}
           >
             {isComplete ? '\u2713' : `${track.listenedCount}/${track.totalRequired}`}
           </span>

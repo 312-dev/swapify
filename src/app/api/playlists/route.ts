@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { db } from '@/db';
 import { playlists, playlistMembers, trackListens } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { createPlaylist } from '@/lib/spotify';
+import { createPlaylist, uploadPlaylistImage, getPlaylistDetails } from '@/lib/spotify';
 import { generateId, generateInviteCode, getFirstName, formatPlaylistName } from '@/lib/utils';
 
 // GET /api/playlists — list user's playlists
@@ -56,8 +57,12 @@ export async function GET() {
 // POST /api/playlists — create a new playlist
 export async function POST(request: NextRequest) {
   const user = await requireAuth();
+
+  const limited = checkRateLimit(`mutation:${user.id}`, RATE_LIMITS.mutation);
+  if (limited) return limited;
+
   const body = await request.json();
-  const { name, description } = body;
+  const { name, description, imageBase64 } = body;
 
   const defaultName = name || formatPlaylistName([getFirstName(user.displayName)]);
   const playlistId = generateId();
@@ -65,6 +70,14 @@ export async function POST(request: NextRequest) {
 
   // Create Spotify playlist
   const spotifyPlaylist = await createPlaylist(user.id, defaultName, description);
+
+  // Upload cover image if provided
+  let imageUrl: string | null = null;
+  if (imageBase64) {
+    await uploadPlaylistImage(user.id, spotifyPlaylist.id, imageBase64);
+    const details = await getPlaylistDetails(user.id, spotifyPlaylist.id);
+    imageUrl = details.imageUrl;
+  }
 
   // Insert playlist
   await db.insert(playlists).values({
@@ -74,6 +87,7 @@ export async function POST(request: NextRequest) {
     spotifyPlaylistId: spotifyPlaylist.id,
     ownerId: user.id,
     inviteCode,
+    imageUrl,
   });
 
   // Owner auto-joins

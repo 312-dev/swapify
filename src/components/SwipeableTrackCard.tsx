@@ -23,6 +23,7 @@ export default function SwipeableTrackCard({
 }: SwipeableTrackCardProps) {
   const [committed, setCommitted] = useState<'right' | 'left' | null>(null);
   const [showReactionOverlay, setShowReactionOverlay] = useState(false);
+  const [tapPosition, setTapPosition] = useState<{ x: number; y: number } | null>(null);
   const x = useMotionValue(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
@@ -71,8 +72,17 @@ export default function SwipeableTrackCard({
     const timeSinceLastTap = now - lastTapRef.current;
 
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-      // Double tap detected
+      // Double tap detected — capture tap coordinates for overlay positioning
       navigator?.vibrate?.(10);
+      const clientX =
+        'clientX' in event
+          ? event.clientX
+          : ((event as TouchEvent).changedTouches?.[0]?.clientX ?? 0);
+      const clientY =
+        'clientY' in event
+          ? event.clientY
+          : ((event as TouchEvent).changedTouches?.[0]?.clientY ?? 0);
+      setTapPosition({ x: clientX, y: clientY });
       setShowReactionOverlay(true);
       lastTapRef.current = 0;
       if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
@@ -146,6 +156,7 @@ export default function SwipeableTrackCard({
         onClose={() => setShowReactionOverlay(false)}
         currentReaction={currentReaction}
         anchorRef={wrapperRef}
+        tapPosition={tapPosition}
       />
     </div>
   );

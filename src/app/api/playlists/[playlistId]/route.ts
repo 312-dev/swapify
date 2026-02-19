@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { updatePlaylistDetails, uploadPlaylistImage, createPlaylist } from '@/lib/spotify';
+import { updatePlaylistDetails, uploadPlaylistImage, getPlaylistDetails } from '@/lib/spotify';
 import { VALID_REMOVAL_DELAYS } from '@/lib/utils';
 
 // GET /api/playlists/[playlistId] — playlist detail
@@ -65,40 +65,11 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const {
-    name,
-    description,
-    imageBase64,
-    archiveThreshold,
-    maxTracksPerUser,
-    maxTrackAgeDays,
-    removalDelay,
-  } = body;
-
-  const validThresholds = ['none', 'no_dislikes', 'at_least_one_like', 'universally_liked'];
+  const { name, description, imageBase64, maxTracksPerUser, maxTrackAgeDays, removalDelay } = body;
 
   const updates: Partial<typeof playlists.$inferInsert> = {};
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
-
-  // Handle archive threshold
-  if (archiveThreshold !== undefined) {
-    if (!validThresholds.includes(archiveThreshold)) {
-      return NextResponse.json({ error: 'Invalid archive threshold' }, { status: 400 });
-    }
-    updates.archiveThreshold = archiveThreshold;
-
-    // Auto-create Keepers playlist when enabling archiving for the first time
-    if (archiveThreshold !== 'none' && !playlist.archivePlaylistId) {
-      const keepersPlaylist = await createPlaylist(
-        user.id,
-        `${playlist.name} Keepers`,
-        `Favorite tracks from ${playlist.name}`,
-        { collaborative: false }
-      );
-      updates.archivePlaylistId = keepersPlaylist.id;
-    }
-  }
 
   // Handle max tracks per user
   if (maxTracksPerUser !== undefined) {
@@ -139,10 +110,12 @@ export async function PATCH(
     await updatePlaylistDetails(user.id, playlist.spotifyPlaylistId, spotifyUpdates);
   }
 
-  // Upload cover image if provided
+  // Upload cover image if provided, then fetch the CDN URL from Spotify
   if (imageBase64) {
     await uploadPlaylistImage(user.id, playlist.spotifyPlaylistId, imageBase64);
-    updates.imageUrl = `data:image/jpeg;base64,${imageBase64.substring(0, 50)}...`;
+    // Spotify processes the image async — fetch the CDN URL it generates
+    const details = await getPlaylistDetails(user.id, playlist.spotifyPlaylistId);
+    updates.imageUrl = details.imageUrl;
   }
 
   if (Object.keys(updates).length > 0) {

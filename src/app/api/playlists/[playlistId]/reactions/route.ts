@@ -49,10 +49,10 @@ export async function POST(
   });
 
   if (existing) {
-    // Update existing reaction
+    // Update existing reaction — no notification (they already got one)
     await db
       .update(trackReactions)
-      .set({ reaction, isAuto: 0 })
+      .set({ reaction, isAuto: false })
       .where(eq(trackReactions.id, existing.id));
   } else {
     // Insert new reaction
@@ -62,8 +62,29 @@ export async function POST(
       spotifyTrackId,
       userId: user.id,
       reaction,
-      isAuto: 0,
+      isAuto: false,
     });
+
+    // Only notify on first reaction, not on changes
+    if (track && track.addedByUserId !== user.id) {
+      const label =
+        reaction === 'thumbs_up'
+          ? 'liked'
+          : reaction === 'thumbs_down'
+            ? 'passed on'
+            : `reacted ${reaction} to`;
+      import('@/lib/notifications').then(({ notify }) => {
+        notify(
+          track.addedByUserId,
+          {
+            title: 'New reaction',
+            body: `${user.displayName} ${label} "${track.trackName}"`,
+            url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
+          },
+          'reactions'
+        );
+      });
+    }
   }
 
   // Update user's recent emojis if it's a custom emoji (not thumbs_up/thumbs_down)

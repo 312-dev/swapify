@@ -1,58 +1,75 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
-  "id": "c774036a-b1d3-490e-9930-91ec7fc76e5d",
+  "id": "1eb582a4-32f0-410d-bd68-d0c62bb6f32c",
   "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "jam_members": {
-      "name": "jam_members",
+    "public.email_invites": {
+      "name": "email_invites",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "jam_id": {
-          "name": "jam_id",
+        "playlist_id": {
+          "name": "playlist_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
+        "sender_user_id": {
+          "name": "sender_user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "integer",
+        "recipient_email": {
+          "name": "recipient_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "now()"
         }
       },
       "indexes": {
-        "jam_members_jam_user_idx": {
-          "name": "jam_members_jam_user_idx",
+        "email_invites_playlist_email_idx": {
+          "name": "email_invites_playlist_email_idx",
           "columns": [
-            "jam_id",
-            "user_id"
+            {
+              "expression": "playlist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "recipient_email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "jam_members_jam_id_jams_id_fk": {
-          "name": "jam_members_jam_id_jams_id_fk",
-          "tableFrom": "jam_members",
-          "tableTo": "jams",
+        "email_invites_playlist_id_playlists_id_fk": {
+          "name": "email_invites_playlist_id_playlists_id_fk",
+          "tableFrom": "email_invites",
+          "tableTo": "playlists",
           "columnsFrom": [
-            "jam_id"
+            "playlist_id"
           ],
           "columnsTo": [
             "id"
@@ -60,9 +77,102 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "jam_members_user_id_users_id_fk": {
-          "name": "jam_members_user_id_users_id_fk",
-          "tableFrom": "jam_members",
+        "email_invites_sender_user_id_users_id_fk": {
+          "name": "email_invites_sender_user_id_users_id_fk",
+          "tableFrom": "email_invites",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sender_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.playlist_members": {
+      "name": "playlist_members",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "playlist_id": {
+          "name": "playlist_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "liked_playlist_id": {
+          "name": "liked_playlist_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "playlist_members_playlist_user_idx": {
+          "name": "playlist_members_playlist_user_idx",
+          "columns": [
+            {
+              "expression": "playlist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "playlist_members_playlist_id_playlists_id_fk": {
+          "name": "playlist_members_playlist_id_playlists_id_fk",
+          "tableFrom": "playlist_members",
+          "tableTo": "playlists",
+          "columnsFrom": [
+            "playlist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "playlist_members_user_id_users_id_fk": {
+          "name": "playlist_members_user_id_users_id_fk",
+          "tableFrom": "playlist_members",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
@@ -76,113 +186,130 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "jam_tracks": {
-      "name": "jam_tracks",
+    "public.playlist_tracks": {
+      "name": "playlist_tracks",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "jam_id": {
-          "name": "jam_id",
+        "playlist_id": {
+          "name": "playlist_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "spotify_track_uri": {
           "name": "spotify_track_uri",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "spotify_track_id": {
           "name": "spotify_track_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "track_name": {
           "name": "track_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "artist_name": {
           "name": "artist_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "album_name": {
           "name": "album_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "album_image_url": {
           "name": "album_image_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "duration_ms": {
           "name": "duration_ms",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "added_by_user_id": {
           "name": "added_by_user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "added_at": {
           "name": "added_at",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "now()"
         },
         "removed_at": {
           "name": "removed_at",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
-        "jam_tracks_jam_uri_idx": {
-          "name": "jam_tracks_jam_uri_idx",
+        "playlist_tracks_playlist_uri_idx": {
+          "name": "playlist_tracks_playlist_uri_idx",
           "columns": [
-            "jam_id",
-            "spotify_track_uri"
+            {
+              "expression": "playlist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spotify_track_uri",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "jam_tracks_jam_id_jams_id_fk": {
-          "name": "jam_tracks_jam_id_jams_id_fk",
-          "tableFrom": "jam_tracks",
-          "tableTo": "jams",
+        "playlist_tracks_playlist_id_playlists_id_fk": {
+          "name": "playlist_tracks_playlist_id_playlists_id_fk",
+          "tableFrom": "playlist_tracks",
+          "tableTo": "playlists",
           "columnsFrom": [
-            "jam_id"
+            "playlist_id"
           ],
           "columnsTo": [
             "id"
@@ -190,9 +317,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "jam_tracks_added_by_user_id_users_id_fk": {
-          "name": "jam_tracks_added_by_user_id_users_id_fk",
-          "tableFrom": "jam_tracks",
+        "playlist_tracks_added_by_user_id_users_id_fk": {
+          "name": "playlist_tracks_added_by_user_id_users_id_fk",
+          "tableFrom": "playlist_tracks",
           "tableTo": "users",
           "columnsFrom": [
             "added_by_user_id"
@@ -206,81 +333,102 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "jams": {
-      "name": "jams",
+    "public.playlists": {
+      "name": "playlists",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "description": {
           "name": "description",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "image_url": {
           "name": "image_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "spotify_playlist_id": {
           "name": "spotify_playlist_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "owner_id": {
           "name": "owner_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "invite_code": {
           "name": "invite_code",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
+        "archive_playlist_id": {
+          "name": "archive_playlist_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archive_threshold": {
+          "name": "archive_threshold",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "max_tracks_per_user": {
+          "name": "max_tracks_per_user",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_track_age_days": {
+          "name": "max_track_age_days",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": 7
+        },
+        "removal_delay": {
+          "name": "removal_delay",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'immediate'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
-      "indexes": {
-        "jams_invite_code_unique": {
-          "name": "jams_invite_code_unique",
-          "columns": [
-            "invite_code"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
-        "jams_owner_id_users_id_fk": {
-          "name": "jams_owner_id_users_id_fk",
-          "tableFrom": "jams",
+        "playlists_owner_id_users_id_fk": {
+          "name": "playlists_owner_id_users_id_fk",
+          "tableFrom": "playlists",
           "tableTo": "users",
           "columnsFrom": [
             "owner_id"
@@ -293,63 +441,82 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
+      "uniqueConstraints": {
+        "playlists_invite_code_unique": {
+          "name": "playlists_invite_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "invite_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "push_subscriptions": {
+    "public.push_subscriptions": {
       "name": "push_subscriptions",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "endpoint": {
           "name": "endpoint",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "p256dh": {
           "name": "p256dh",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "auth": {
           "name": "auth",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "now()"
         }
       },
       "indexes": {
         "push_sub_user_endpoint_idx": {
           "name": "push_sub_user_endpoint_idx",
           "columns": [
-            "user_id",
-            "endpoint"
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "endpoint",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -369,65 +536,94 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "track_listens": {
+    "public.track_listens": {
       "name": "track_listens",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "jam_id": {
-          "name": "jam_id",
+        "playlist_id": {
+          "name": "playlist_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "spotify_track_id": {
           "name": "spotify_track_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "listened_at": {
           "name": "listened_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "listen_duration_ms": {
+          "name": "listen_duration_ms",
           "type": "integer",
           "primaryKey": false,
+          "notNull": false
+        },
+        "was_skipped": {
+          "name": "was_skipped",
+          "type": "boolean",
+          "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": false
         }
       },
       "indexes": {
-        "track_listens_jam_track_user_idx": {
-          "name": "track_listens_jam_track_user_idx",
+        "track_listens_playlist_track_user_idx": {
+          "name": "track_listens_playlist_track_user_idx",
           "columns": [
-            "jam_id",
-            "spotify_track_id",
-            "user_id"
+            {
+              "expression": "playlist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spotify_track_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "track_listens_jam_id_jams_id_fk": {
-          "name": "track_listens_jam_id_jams_id_fk",
+        "track_listens_playlist_id_playlists_id_fk": {
+          "name": "track_listens_playlist_id_playlists_id_fk",
           "tableFrom": "track_listens",
-          "tableTo": "jams",
+          "tableTo": "playlists",
           "columnsFrom": [
-            "jam_id"
+            "playlist_id"
           ],
           "columnsTo": [
             "id"
@@ -451,80 +647,95 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "track_reactions": {
+    "public.track_reactions": {
       "name": "track_reactions",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "jam_id": {
-          "name": "jam_id",
+        "playlist_id": {
+          "name": "playlist_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "spotify_track_id": {
           "name": "spotify_track_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "reaction": {
           "name": "reaction",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "is_auto": {
           "name": "is_auto",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "now()"
         }
       },
       "indexes": {
-        "track_reactions_jam_track_user_idx": {
-          "name": "track_reactions_jam_track_user_idx",
+        "track_reactions_playlist_track_user_idx": {
+          "name": "track_reactions_playlist_track_user_idx",
           "columns": [
-            "jam_id",
-            "spotify_track_id",
-            "user_id"
+            {
+              "expression": "playlist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spotify_track_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "track_reactions_jam_id_jams_id_fk": {
-          "name": "track_reactions_jam_id_jams_id_fk",
+        "track_reactions_playlist_id_playlists_id_fk": {
+          "name": "track_reactions_playlist_id_playlists_id_fk",
           "tableFrom": "track_reactions",
-          "tableTo": "jams",
+          "tableTo": "playlists",
           "columnsFrom": [
-            "jam_id"
+            "playlist_id"
           ],
           "columnsTo": [
             "id"
@@ -548,136 +759,153 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "users": {
+    "public.users": {
       "name": "users",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "spotify_id": {
           "name": "spotify_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "display_name": {
           "name": "display_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "avatar_url": {
           "name": "avatar_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "email": {
           "name": "email",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "pending_email": {
+          "name": "pending_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_verify_token": {
+          "name": "email_verify_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_verify_expires_at": {
+          "name": "email_verify_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "notify_push": {
           "name": "notify_push",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 1
+          "default": true
         },
         "notify_email": {
           "name": "notify_email",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "auto_negative_reactions": {
           "name": "auto_negative_reactions",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 1
+          "default": true
         },
         "recent_emojis": {
           "name": "recent_emojis",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "access_token": {
           "name": "access_token",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "refresh_token": {
           "name": "refresh_token",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "token_expires_at": {
           "name": "token_expires_at",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "last_poll_cursor": {
           "name": "last_poll_cursor",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "last_playback_json": {
+          "name": "last_playback_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "now()"
         }
       },
-      "indexes": {
-        "users_spotify_id_unique": {
-          "name": "users_spotify_id_unique",
-          "columns": [
-            "spotify_id"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
+      "uniqueConstraints": {
+        "users_spotify_id_unique": {
+          "name": "users_spotify_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "spotify_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
-  "views": {},
   "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "internal": {
-    "indexes": {}
+    "tables": {}
   }
 }

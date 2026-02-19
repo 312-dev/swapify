@@ -6,6 +6,7 @@ export interface SessionData {
   displayName?: string;
   avatarUrl?: string;
   codeVerifier?: string;
+  spotifyClientId?: string;
   returnTo?: string;
 }
 

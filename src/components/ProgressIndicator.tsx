@@ -42,7 +42,7 @@ export default function ProgressIndicator({
         </div>
         <span className="text-sm text-muted">
           {isComplete ? (
-            <span className="text-spotify font-medium">All listened!</span>
+            <span className="text-brand font-medium">All listened!</span>
           ) : (
             `${listenedCount}/${totalRequired} listened`
           )}
@@ -53,7 +53,7 @@ export default function ProgressIndicator({
       <div className="h-1 bg-border rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 progress-bar-animated ${
-            isComplete ? 'bg-spotify' : 'bg-spotify/60'
+            isComplete ? 'bg-brand' : 'bg-brand/60'
           }`}
           style={{ width: `${percentage}%` }}
         />

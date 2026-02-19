@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { db } from '@/db';
 import { playlists } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 // GET /api/playlists/resolve?code=ABC123 — resolve invite code to playlist
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const limited = checkRateLimit(`public:${ip}`, RATE_LIMITS.public);
+  if (limited) return limited;
+
   const code = request.nextUrl.searchParams.get('code');
 
   if (!code) {

@@ -14,11 +14,15 @@ import {
   removeItemsFromPlaylist,
   addItemsToPlaylist,
   getCurrentPlayback,
+  checkSavedTracks,
   isRateLimited,
+  TokenInvalidError,
 } from './spotify';
 import { sendEmail } from './email';
 import { generateId, getRemovalDelayMs, type RemovalDelay } from './utils';
 import type { SpotifyRecentlyPlayedItem } from '@/types/spotify';
+import { logger } from '@/lib/logger';
+import { spotifyConfig, isOverBudget } from '@/lib/spotify-config';
 
 const SKIP_THRESHOLD = 0.5; // < 50% listened = skip
 
@@ -65,49 +69,107 @@ export async function runPollCycle(): Promise<PollCycleResult> {
 
   // 3. Poll each user
   for (const { userId } of activeMembers) {
-    if (isRateLimited()) {
-      console.warn('[Swapify] Rate-limited by Spotify, aborting poll cycle');
+    if (isRateLimited() || isOverBudget()) {
+      logger.warn('[Swapify] Rate-limited or over API budget, aborting poll cycle');
       break;
     }
 
     try {
       await pollUser(userId, counters);
     } catch (error) {
-      console.error(`Error polling user ${userId}:`, error);
+      if (error instanceof TokenInvalidError) {
+        logger.warn(`[Swapify] Token invalid for user ${userId}, clearing refresh token`);
+        const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+        // Clear refresh token so poller skips this user until they re-login
+        await db.update(users).set({ refreshToken: '' }).where(eq(users.id, userId));
+        // Account-critical email — always send regardless of notifyEmail preference
+        if (user?.email) {
+          await sendEmail(
+            user.email,
+            'Your Spotify connection needs attention',
+            'Your Spotify session has expired and we can no longer track your listening. Please log in to Swapify again to reconnect your account.',
+            process.env.NEXT_PUBLIC_BASE_URL || 'https://swapify.app',
+            user.id
+          );
+        }
+        continue;
+      }
+      logger.error({ error, userId }, 'Error polling user');
     }
 
     await new Promise((r) => setTimeout(r, interUserDelayMs));
   }
 
-  // 4. Check for age-based track expiry
+  // 4. Sweep for completed tracks that weren't removed on first detection
+  const affectedPlaylistIds = new Set<string>();
   try {
-    const expiredRemoved = await checkAndRemoveExpiredTracks();
-    counters.tracksRemoved += expiredRemoved;
+    const { count, playlistIds } = await checkAndRemoveAllCompletedTracks();
+    counters.tracksRemoved += count;
+    playlistIds.forEach((id) => affectedPlaylistIds.add(id));
   } catch (error) {
-    console.error('[Swapify] Expired track check error:', error);
+    logger.error({ error }, '[Swapify] Completion sweep error');
   }
 
-  // 4b. Check for delayed removal tracks (completedAt + delay elapsed)
+  // 5. Check for age-based track expiry
   try {
-    const delayedRemoved = await checkAndRemoveDelayedTracks();
-    counters.tracksRemoved += delayedRemoved;
+    const { count, playlistIds } = await checkAndRemoveExpiredTracks();
+    counters.tracksRemoved += count;
+    playlistIds.forEach((id) => affectedPlaylistIds.add(id));
   } catch (error) {
-    console.error('[Swapify] Delayed track removal check error:', error);
+    logger.error({ error }, '[Swapify] Expired track check error');
   }
 
-  // 5. Playlist audit every N cycles (detect external adds, enforce limits)
+  // 6. Check for delayed removal tracks (completedAt + delay elapsed)
+  try {
+    const { count, playlistIds } = await checkAndRemoveDelayedTracks();
+    counters.tracksRemoved += count;
+    playlistIds.forEach((id) => affectedPlaylistIds.add(id));
+  } catch (error) {
+    logger.error({ error }, '[Swapify] Delayed track removal check error');
+  }
+
+  // Regenerate vibe names for playlists that had tracks removed
+  for (const playlistId of affectedPlaylistIds) {
+    import('@/lib/vibe-sort').then(({ vibeSort }) => {
+      vibeSort(playlistId).catch(() => {});
+    });
+  }
+
+  // 7. Check if members saved active tracks to their Spotify library → auto-like
+  savedCheckCycleCount++;
+  if (savedCheckCycleCount >= spotifyConfig.savedCheckEveryNCycles) {
+    savedCheckCycleCount = 0;
+    try {
+      await checkSavedTracksForAutoLike();
+    } catch (error) {
+      logger.error({ error }, '[Swapify] Saved tracks auto-like check error');
+    }
+  }
+
+  // 8. Playlist audit every N cycles (detect external adds, enforce limits)
   auditCycleCount++;
-  if (auditCycleCount >= AUDIT_EVERY_N_CYCLES) {
+  if (auditCycleCount >= spotifyConfig.auditEveryNCycles) {
     auditCycleCount = 0;
     try {
       const auditResult = await runPlaylistAudit();
       if (auditResult.unauthorizedRemoved > 0 || auditResult.overLimitRemoved > 0) {
-        console.log(
+        logger.info(
           `[Swapify] Audit: ${auditResult.unauthorizedRemoved} unauthorized removed, ${auditResult.overLimitRemoved} over-limit removed`
         );
       }
     } catch (error) {
-      console.error('[Swapify] Playlist audit error:', error);
+      logger.error({ error }, '[Swapify] Playlist audit error');
+    }
+  }
+
+  // 8. Sync liked playlists every N cycles
+  likedSyncCycleCount++;
+  if (likedSyncCycleCount >= spotifyConfig.likedSyncEveryNCycles) {
+    likedSyncCycleCount = 0;
+    try {
+      await syncAllLikedPlaylists();
+    } catch (error) {
+      logger.error({ error }, '[Swapify] Liked playlist sync error');
     }
   }
 
@@ -124,6 +186,9 @@ async function pollUser(
     where: eq(users.id, userId),
   });
   if (!user) return;
+
+  // Skip users whose refresh token was cleared (needs re-login)
+  if (!user.refreshToken) return;
 
   const recentTracks = await getRecentlyPlayed(userId, user.lastPollCursor ?? undefined);
 
@@ -194,7 +259,7 @@ async function pollUser(
 
 async function handleSkipDetection(
   userId: string,
-  autoNegativeReactions: number,
+  autoNegativeReactions: boolean,
   lastPlayback: PlaybackSnapshot,
   recentTracks: SpotifyRecentlyPlayedItem[]
 ): Promise<number> {
@@ -230,7 +295,7 @@ async function handleSkipDetection(
           userId,
           listenedAt: new Date(),
           listenDurationMs: lastPlayback.progressMs,
-          wasSkipped: 1,
+          wasSkipped: true,
         });
         skips++;
       } catch {
@@ -285,9 +350,6 @@ async function processRecentlyPlayed(
       );
       if (recorded) counters.listensRecorded++;
 
-      // Auto thumbs_up for full listen (upgrades previous auto-skip reactions)
-      await setAutoReaction(playlistTrack.playlistId, play.track.id, userId, 'thumbs_up');
-
       // Check if all members have listened → remove from playlist
       const removed = await checkAndRemoveIfComplete(playlistTrack);
       if (removed) counters.tracksRemoved++;
@@ -330,7 +392,7 @@ async function recordFullListen(
     if (existing.wasSkipped) {
       await db
         .update(trackListens)
-        .set({ wasSkipped: 0, listenDurationMs: durationMs, listenedAt })
+        .set({ wasSkipped: false, listenDurationMs: durationMs, listenedAt })
         .where(eq(trackListens.id, existing.id));
       return true;
     }
@@ -345,7 +407,7 @@ async function recordFullListen(
       userId,
       listenedAt,
       listenDurationMs: durationMs,
-      wasSkipped: 0,
+      wasSkipped: false,
     });
     return true;
   } catch {
@@ -356,10 +418,10 @@ async function recordFullListen(
 /**
  * Sets an auto-reaction for a user on a track.
  * - Won't overwrite manual reactions.
- * - thumbs_up upgrades a previous auto thumbs_down (skip → full listen).
+ * - thumbs_up upgrades a previous auto thumbs_down (skip → library save).
  * - thumbs_down won't overwrite an existing auto thumbs_up.
  */
-async function setAutoReaction(
+export async function setAutoReaction(
   playlistId: string,
   spotifyTrackId: string,
   userId: string,
@@ -381,10 +443,10 @@ async function setAutoReaction(
         spotifyTrackId,
         userId,
         reaction,
-        isAuto: 1,
+        isAuto: true,
       });
     } else if (existing.isAuto && reaction === 'thumbs_up' && existing.reaction === 'thumbs_down') {
-      // Upgrade auto thumbs_down (from skip) to thumbs_up (full listen)
+      // Upgrade auto thumbs_down (from skip) to thumbs_up (library save)
       await db
         .update(trackReactions)
         .set({ reaction: 'thumbs_up' })
@@ -407,31 +469,13 @@ async function removeAndArchiveTrack(
       track.spotifyTrackUri,
     ]);
   } catch (error) {
-    console.error('Failed to remove track from Spotify playlist:', error);
+    logger.error({ error }, 'Failed to remove track from Spotify playlist');
   }
 
   await db
     .update(playlistTracks)
     .set({ removedAt: new Date() })
     .where(eq(playlistTracks.id, track.id));
-
-  // Archive to Keepers playlist if threshold is met
-  if (playlist.archiveThreshold !== 'none' && playlist.archivePlaylistId) {
-    try {
-      const shouldArchive = await evaluateArchiveThreshold(playlist, track);
-      if (shouldArchive) {
-        await addItemsToPlaylist(playlist.ownerId, playlist.archivePlaylistId, [
-          track.spotifyTrackUri,
-        ]);
-        await db
-          .update(playlistTracks)
-          .set({ archivedAt: new Date() })
-          .where(eq(playlistTracks.id, track.id));
-      }
-    } catch (error) {
-      console.error('Failed to archive track to Keepers:', error);
-    }
-  }
 
   return true;
 }
@@ -455,10 +499,21 @@ async function checkAndRemoveIfComplete(
     ),
   });
 
-  // Only count full listens (not skips) toward completion
+  // Reactions also count as engagement (user has heard the track)
+  const reactions = await db.query.trackReactions.findMany({
+    where: and(
+      eq(trackReactions.playlistId, track.playlistId),
+      eq(trackReactions.spotifyTrackId, track.spotifyTrackId)
+    ),
+  });
+
+  // Count full listens + any reactions toward completion
   const fullListens = listens.filter((l) => !l.wasSkipped);
-  const listenedUserIds = new Set(fullListens.map((l) => l.userId));
-  const allListened = members.every((m) => listenedUserIds.has(m.userId));
+  const engagedUserIds = new Set([
+    ...fullListens.map((l) => l.userId),
+    ...reactions.map((r) => r.userId),
+  ]);
+  const allListened = members.every((m) => engagedUserIds.has(m.userId));
 
   if (!allListened) return false;
 
@@ -484,14 +539,39 @@ async function checkAndRemoveIfComplete(
   return false;
 }
 
+// ─── Completion Sweep (catch tracks missed by event-driven check) ──────────
+
+async function checkAndRemoveAllCompletedTracks(): Promise<{
+  count: number;
+  playlistIds: Set<string>;
+}> {
+  const activeTracks = await db.query.playlistTracks.findMany({
+    where: and(isNull(playlistTracks.removedAt), isNull(playlistTracks.completedAt)),
+  });
+
+  let count = 0;
+  const playlistIds = new Set<string>();
+
+  for (const track of activeTracks) {
+    const removed = await checkAndRemoveIfComplete(track);
+    if (removed) {
+      count++;
+      playlistIds.add(track.playlistId);
+    }
+  }
+
+  return { count, playlistIds };
+}
+
 // ─── Age-Based Track Expiry ────────────────────────────────────────────────
 
-async function checkAndRemoveExpiredTracks(): Promise<number> {
+async function checkAndRemoveExpiredTracks(): Promise<{ count: number; playlistIds: Set<string> }> {
   const expiryPlaylists = await db.query.playlists.findMany({
     where: gt(playlists.maxTrackAgeDays, 0),
   });
 
-  let removedCount = 0;
+  let count = 0;
+  const playlistIds = new Set<string>();
 
   for (const playlist of expiryPlaylists) {
     const cutoff = new Date(Date.now() - playlist.maxTrackAgeDays * 24 * 60 * 60 * 1000);
@@ -505,33 +585,29 @@ async function checkAndRemoveExpiredTracks(): Promise<number> {
     });
 
     for (const track of oldTracks) {
-      // Only expire if at least 1 non-adder member has listened (any listen, including skips)
-      const nonAdderListen = await db.query.trackListens.findFirst({
-        where: and(
-          eq(trackListens.playlistId, playlist.id),
-          eq(trackListens.spotifyTrackId, track.spotifyTrackId),
-          ne(trackListens.userId, track.addedByUserId)
-        ),
-      });
-
-      if (!nonAdderListen) continue;
-
+      // Remove tracks that have exceeded the age limit.
+      // No listen requirement — the age limit is the fallback for
+      // listeners who aren't on the web app (their listens aren't tracked).
       const removed = await removeAndArchiveTrack(track, playlist);
-      if (removed) removedCount++;
+      if (removed) {
+        count++;
+        playlistIds.add(playlist.id);
+      }
     }
   }
 
-  return removedCount;
+  return { count, playlistIds };
 }
 
 // ─── Delayed Track Removal ─────────────────────────────────────────────────
 
-async function checkAndRemoveDelayedTracks(): Promise<number> {
+async function checkAndRemoveDelayedTracks(): Promise<{ count: number; playlistIds: Set<string> }> {
   const pendingTracks = await db.query.playlistTracks.findMany({
     where: and(isNull(playlistTracks.removedAt), isNotNull(playlistTracks.completedAt)),
   });
 
-  let removedCount = 0;
+  let count = 0;
+  const playlistIds = new Set<string>();
 
   for (const track of pendingTracks) {
     const playlist = await db.query.playlists.findFirst({
@@ -544,50 +620,105 @@ async function checkAndRemoveDelayedTracks(): Promise<number> {
 
     if (elapsed >= delayMs) {
       const removed = await removeAndArchiveTrack(track, playlist);
-      if (removed) removedCount++;
+      if (removed) {
+        count++;
+        playlistIds.add(track.playlistId);
+      }
     }
   }
 
-  return removedCount;
+  return { count, playlistIds };
 }
 
-async function evaluateArchiveThreshold(
-  playlist: typeof playlists.$inferSelect,
-  track: typeof playlistTracks.$inferSelect
-): Promise<boolean> {
-  const reactions = await db.query.trackReactions.findMany({
-    where: and(
-      eq(trackReactions.playlistId, track.playlistId),
-      eq(trackReactions.spotifyTrackId, track.spotifyTrackId)
-    ),
+// ─── Library Save Detection (auto-like) ─────────────────────────────────
+
+let savedCheckCycleCount = 0;
+
+/**
+ * For each active playlist track, check if non-adder members have saved
+ * it to their Spotify library. If so, auto-like it.
+ * Batches up to 50 track IDs per Spotify API call.
+ */
+async function checkSavedTracksForAutoLike(): Promise<void> {
+  const activeTracks = await db.query.playlistTracks.findMany({
+    where: isNull(playlistTracks.removedAt),
   });
 
-  const members = await db.query.playlistMembers.findMany({
-    where: and(
-      eq(playlistMembers.playlistId, track.playlistId),
-      ne(playlistMembers.userId, track.addedByUserId)
-    ),
+  if (activeTracks.length === 0) return;
+
+  // Group tracks by playlist
+  const tracksByPlaylist = new Map<string, (typeof activeTracks)[number][]>();
+  for (const track of activeTracks) {
+    const list = tracksByPlaylist.get(track.playlistId) ?? [];
+    list.push(track);
+    tracksByPlaylist.set(track.playlistId, list);
+  }
+
+  // Get all existing thumbs_up reactions so we can skip tracks already liked
+  const existingUpReactions = await db.query.trackReactions.findMany({
+    where: eq(trackReactions.reaction, 'thumbs_up'),
   });
+  const upReactionKeys = new Set(
+    existingUpReactions.map((r) => `${r.playlistId}:${r.spotifyTrackId}:${r.userId}`)
+  );
 
-  const thumbsUp = reactions.filter((r) => r.reaction === 'thumbs_up');
-  const thumbsDown = reactions.filter((r) => r.reaction === 'thumbs_down');
+  for (const [playlistId, tracks] of tracksByPlaylist) {
+    if (isRateLimited() || isOverBudget()) break;
 
-  switch (playlist.archiveThreshold) {
-    case 'no_dislikes':
-      return thumbsDown.length === 0;
-    case 'at_least_one_like':
-      return thumbsUp.length >= 1;
-    case 'universally_liked':
-      return members.every((m) => thumbsUp.some((r) => r.userId === m.userId));
-    default:
-      return false;
+    const members = await db.query.playlistMembers.findMany({
+      where: eq(playlistMembers.playlistId, playlistId),
+    });
+
+    for (const member of members) {
+      if (isRateLimited() || isOverBudget()) break;
+      await checkMemberSavedTracks(playlistId, tracks, member.userId, upReactionKeys);
+    }
+  }
+}
+
+/** Check whether a single member has saved any of the given playlist tracks to their library. */
+async function checkMemberSavedTracks(
+  playlistId: string,
+  tracks: (typeof playlistTracks.$inferSelect)[],
+  userId: string,
+  upReactionKeys: Set<string>
+): Promise<void> {
+  const uncheckedTracks = tracks.filter(
+    (t) =>
+      t.addedByUserId !== userId &&
+      !upReactionKeys.has(`${playlistId}:${t.spotifyTrackId}:${userId}`)
+  );
+
+  if (uncheckedTracks.length === 0) return;
+
+  // Batch check in groups of 50 (Spotify API limit)
+  for (let i = 0; i < uncheckedTracks.length; i += 50) {
+    if (isRateLimited()) break;
+
+    const batch = uncheckedTracks.slice(i, i + 50);
+    try {
+      const savedFlags = await checkSavedTracks(
+        userId,
+        batch.map((t) => t.spotifyTrackId)
+      );
+      for (let j = 0; j < batch.length; j++) {
+        const track = batch[j];
+        if (savedFlags[j] && track) {
+          await setAutoReaction(playlistId, track.spotifyTrackId, userId, 'thumbs_up');
+        }
+      }
+    } catch (error) {
+      if (error instanceof TokenInvalidError) return;
+      // Rate limited or other transient error — skip batch
+    }
   }
 }
 
 // ─── Playlist Audit (external add enforcement) ─────────────────────────
 
 let auditCycleCount = 0;
-const AUDIT_EVERY_N_CYCLES = 2;
+
+let likedSyncCycleCount = 0;
 
 export async function runPlaylistAudit(): Promise<{
   unauthorizedRemoved: number;
@@ -601,12 +732,12 @@ export async function runPlaylistAudit(): Promise<{
     .where(isNull(playlistTracks.removedAt));
 
   for (const { playlistId } of activeTrackPlaylistIds) {
-    if (isRateLimited()) break;
+    if (isRateLimited() || isOverBudget()) break;
 
     try {
       await auditPlaylist(playlistId, counters);
     } catch (error) {
-      console.error(`[Swapify] Audit error for playlist ${playlistId}:`, error);
+      logger.error({ error, playlistId }, '[Swapify] Audit error for playlist');
     }
   }
 
@@ -634,6 +765,7 @@ async function auditPlaylist(
   if (externalItems.length === 0) return;
 
   const urisToRemove: string[] = [];
+  let adopted = 0;
 
   for (const spotifyItem of externalItems) {
     const spotifyUserId = spotifyItem.added_by.id;
@@ -665,14 +797,18 @@ async function auditPlaylist(
         urisToRemove.push(spotifyItem.track.uri);
         counters.overLimitRemoved++;
 
-        if (appUser.email) {
-          await sendEmail(
-            appUser.email,
-            'Track removed',
-            `Your track "${spotifyItem.track.name}" by ${spotifyItem.track.artists.map((a) => a.name).join(', ')} was removed from "${playlist.name}" because you've reached the limit of ${playlist.maxTracksPerUser} active track${playlist.maxTracksPerUser === 1 ? '' : 's'} per member.`,
-            `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`
+        // Notify via both push + email, respecting granular prefs
+        import('@/lib/notifications').then(({ notify }) => {
+          notify(
+            appUser.id,
+            {
+              title: 'Track removed',
+              body: `Your track "${spotifyItem.track.name}" by ${spotifyItem.track.artists.map((a) => a.name).join(', ')} was removed from "${playlist.name}" because you've reached the limit of ${playlist.maxTracksPerUser} active track${playlist.maxTracksPerUser === 1 ? '' : 's'} per member.`,
+              url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
+            },
+            'trackRemoved'
           );
-        }
+        });
         continue;
       }
     }
@@ -691,6 +827,7 @@ async function auditPlaylist(
         durationMs: spotifyItem.track.duration_ms || null,
         addedByUserId: appUser.id,
       });
+      adopted++;
     } catch {
       // Unique constraint violation — already tracked
     }
@@ -700,7 +837,103 @@ async function auditPlaylist(
     try {
       await removeItemsFromPlaylist(playlist.ownerId, playlist.spotifyPlaylistId, urisToRemove);
     } catch (error) {
-      console.error(`[Swapify] Failed to remove unauthorized/over-limit tracks:`, error);
+      logger.error({ error }, '[Swapify] Failed to remove unauthorized/over-limit tracks');
+    }
+  }
+
+  // Auto-sort playlist by vibe when new tracks were adopted (fire-and-forget)
+  if (adopted > 0) {
+    import('./vibe-sort').then(({ vibeSort }) => {
+      vibeSort(playlistId).catch(() => {});
+    });
+  }
+}
+
+// ─── Liked Playlist Sync ─────────────────────────────────────────────────
+
+export async function syncLikedPlaylist(
+  userId: string,
+  playlistId: string,
+  likedPlaylistId: string
+): Promise<boolean> {
+  // Get user's liked reactions
+  const likedReactions = await db.query.trackReactions.findMany({
+    where: and(
+      eq(trackReactions.playlistId, playlistId),
+      eq(trackReactions.userId, userId),
+      eq(trackReactions.reaction, 'thumbs_up')
+    ),
+  });
+
+  const likedTrackIds = new Set(likedReactions.map((r) => r.spotifyTrackId));
+
+  // Get track URIs for liked tracks
+  const allTracks = await db.query.playlistTracks.findMany({
+    where: eq(playlistTracks.playlistId, playlistId),
+  });
+  const desiredUris = new Set<string>();
+  for (const t of allTracks) {
+    if (likedTrackIds.has(t.spotifyTrackId)) {
+      desiredUris.add(t.spotifyTrackUri);
+    }
+  }
+
+  // Get current Spotify playlist contents
+  let spotifyItems: Awaited<ReturnType<typeof getPlaylistItems>>;
+  try {
+    spotifyItems = await getPlaylistItems(userId, likedPlaylistId);
+  } catch (error) {
+    if (String(error).includes('404') || String(error).includes('Not Found')) {
+      // Playlist was deleted — clear likedPlaylistId
+      const membership = await db.query.playlistMembers.findFirst({
+        where: and(eq(playlistMembers.playlistId, playlistId), eq(playlistMembers.userId, userId)),
+      });
+      if (membership) {
+        await db
+          .update(playlistMembers)
+          .set({ likedPlaylistId: null })
+          .where(eq(playlistMembers.id, membership.id));
+      }
+      return false;
+    }
+    throw error;
+  }
+
+  const spotifyUris = new Set(spotifyItems.map((item) => item.track.uri));
+
+  // Diff
+  const toAdd = [...desiredUris].filter((uri) => !spotifyUris.has(uri));
+  const toRemove = [...spotifyUris].filter((uri) => !desiredUris.has(uri));
+
+  if (toAdd.length > 0) {
+    for (let i = 0; i < toAdd.length; i += 100) {
+      await addItemsToPlaylist(userId, likedPlaylistId, toAdd.slice(i, i + 100));
+    }
+  }
+  if (toRemove.length > 0) {
+    for (let i = 0; i < toRemove.length; i += 100) {
+      await removeItemsFromPlaylist(userId, likedPlaylistId, toRemove.slice(i, i + 100));
+    }
+  }
+
+  return true;
+}
+
+async function syncAllLikedPlaylists(): Promise<void> {
+  const membersWithLiked = await db.query.playlistMembers.findMany({
+    where: isNotNull(playlistMembers.likedPlaylistId),
+  });
+
+  for (const member of membersWithLiked) {
+    if (isRateLimited() || isOverBudget()) break;
+    try {
+      await syncLikedPlaylist(member.userId, member.playlistId, member.likedPlaylistId!);
+    } catch (error) {
+      if (error instanceof TokenInvalidError) {
+        logger.warn(`[Swapify] Token invalid for user ${member.userId} during liked sync`);
+        continue;
+      }
+      logger.error({ error, userId: member.userId }, '[Swapify] Liked sync error for member');
     }
   }
 }
@@ -708,22 +941,30 @@ async function auditPlaylist(
 // ─── Polling Loop ───────────────────────────────────────────────────────────
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+let pollRunning = false;
 
-export function startPollingLoop(intervalMs: number = 30000) {
+export function startPollingLoop(intervalMs: number = spotifyConfig.pollIntervalMs) {
   if (pollInterval) return;
 
-  console.log(`[Swapify] Starting poll loop every ${intervalMs}ms`);
+  logger.info(`[Swapify] Starting poll loop every ${intervalMs}ms`);
 
   pollInterval = setInterval(async () => {
+    if (pollRunning) {
+      logger.warn('[Swapify] Previous poll cycle still running, skipping');
+      return;
+    }
+    pollRunning = true;
     try {
       const result = await runPollCycle();
       if (result.listensRecorded > 0 || result.skipsDetected > 0 || result.tracksRemoved > 0) {
-        console.log(
+        logger.info(
           `[Swapify] Poll: ${result.usersPolled} users, ${result.listensRecorded} listens, ${result.skipsDetected} skips, ${result.tracksRemoved} removed`
         );
       }
     } catch (error) {
-      console.error('[Swapify] Poll cycle error:', error);
+      logger.error({ error }, '[Swapify] Poll cycle error');
+    } finally {
+      pollRunning = false;
     }
   }, intervalMs);
 }
@@ -732,6 +973,6 @@ export function stopPollingLoop() {
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;
-    console.log('[Swapify] Polling stopped');
+    logger.info('[Swapify] Polling stopped');
   }
 }

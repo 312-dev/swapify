@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers } from '@/db/schema';
@@ -25,16 +26,20 @@ export default async function PlaylistDetailPage({
   if (!playlist) notFound();
 
   return (
-    <PlaylistDetailClient
-      playlistId={playlistId}
-      playlistName={playlist.name}
-      playlistDescription={playlist.description}
-      playlistImageUrl={playlist.imageUrl}
-      inviteCode={playlist.inviteCode}
-      isOwner={playlist.ownerId === user.id}
-      ownerId={playlist.ownerId}
-      currentUserId={user.id}
-      spotifyPlaylistId={playlist.spotifyPlaylistId}
-    />
+    <Suspense>
+      <PlaylistDetailClient
+        playlistId={playlistId}
+        playlistName={playlist.name}
+        playlistDescription={playlist.description}
+        playlistImageUrl={playlist.imageUrl}
+        inviteCode={playlist.inviteCode}
+        isOwner={playlist.ownerId === user.id}
+        ownerId={playlist.ownerId}
+        currentUserId={user.id}
+        spotifyPlaylistId={playlist.spotifyPlaylistId}
+        vibeName={playlist.vibeName}
+        ownerSpotifyClientId={playlist.owner.spotifyClientId ?? undefined}
+      />
+    </Suspense>
   );
 }

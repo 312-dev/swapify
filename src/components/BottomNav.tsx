@@ -2,29 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ListMusic } from 'lucide-react';
 
 const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist'];
-
-function GridIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  );
-}
 
 function ActivityIcon({ className }: { className?: string }) {
   return (
@@ -64,7 +44,7 @@ function ProfileIcon({ className }: { className?: string }) {
 }
 
 const tabs = [
-  { label: 'Swaplists', href: '/dashboard', icon: GridIcon },
+  { label: 'Swaplists', href: '/dashboard', icon: ListMusic },
   { label: 'Activity', href: '/activity', icon: ActivityIcon },
   { label: 'Profile', href: '/profile', icon: ProfileIcon },
 ] as const;
@@ -95,7 +75,7 @@ export default function BottomNav() {
               key={href}
               href={href}
               className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${
-                isActive ? 'text-spotify' : 'text-text-secondary'
+                isActive ? 'text-brand' : 'text-text-secondary'
               }`}
             >
               <Icon />

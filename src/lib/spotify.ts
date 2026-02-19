@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { encrypt, decrypt } from '@/lib/crypto';
 import type {
   SpotifyTokenResponse,
   SpotifyUser,
@@ -11,22 +12,60 @@ import type {
   SpotifyPlaylistItem,
 } from '@/types/spotify';
 
+import { trackSpotifyApiCall, waitForBudget, spotifyConfig } from '@/lib/spotify-config';
+
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const SPOTIFY_ACCOUNTS = 'https://accounts.spotify.com';
 
 // ─── Token Management ────────────────────────────────────────────────────────
 
+/** Thrown when a refresh token is permanently invalid (revoked, already rotated, etc.) */
+export class TokenInvalidError extends Error {
+  constructor(
+    public userId: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'TokenInvalidError';
+  }
+}
+
+// Per-user mutex: dedup concurrent refresh attempts so only one hits Spotify
+const inflightRefreshes = new Map<string, Promise<string>>();
+
 export async function refreshAccessToken(userId: string): Promise<string> {
+  // If there's already an in-flight refresh for this user, reuse it
+  const existing = inflightRefreshes.get(userId);
+  if (existing) return existing;
+
+  const promise = _doRefresh(userId);
+  inflightRefreshes.set(userId, promise);
+  try {
+    return await promise;
+  } finally {
+    inflightRefreshes.delete(userId);
+  }
+}
+
+async function _doRefresh(userId: string): Promise<string> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
 
   if (!user) throw new Error(`User ${userId} not found`);
 
+  // User's refresh token was previously invalidated — skip
+  if (!user.refreshToken) {
+    throw new TokenInvalidError(userId, `User ${userId} has no refresh token (needs re-login)`);
+  }
+
+  // Decrypt the refresh token before using it
+  const refreshToken = decrypt(user.refreshToken);
+
   const now = Math.floor(Date.now() / 1000);
-  // If token has > 5 minutes remaining, return existing
+  // If token has > 5 minutes remaining, return existing (decrypt before returning)
   if (user.tokenExpiresAt - now > 300) {
-    return user.accessToken;
+    return decrypt(user.accessToken);
   }
 
   const res = await fetch(`${SPOTIFY_ACCOUNTS}/api/token`, {
@@ -34,13 +73,17 @@ export async function refreshAccessToken(userId: string): Promise<string> {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: user.refreshToken,
-      client_id: process.env.SPOTIFY_CLIENT_ID!,
+      refresh_token: refreshToken,
+      client_id: user.spotifyClientId || process.env.SPOTIFY_CLIENT_ID!,
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
+    // invalid_grant = refresh token revoked or already rotated — not retryable
+    if (res.status === 400 && err.includes('invalid_grant')) {
+      throw new TokenInvalidError(userId, `Refresh token invalid for user ${userId}`);
+    }
     throw new Error(`Token refresh failed: ${res.status} ${err}`);
   }
 
@@ -49,8 +92,8 @@ export async function refreshAccessToken(userId: string): Promise<string> {
   await db
     .update(users)
     .set({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? user.refreshToken,
+      accessToken: encrypt(data.access_token),
+      refreshToken: data.refresh_token ? encrypt(data.refresh_token) : user.refreshToken,
       tokenExpiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
     })
     .where(eq(users.id, userId));
@@ -86,8 +129,12 @@ async function spotifyFetch(
     await new Promise((r) => setTimeout(r, waitMs));
   }
 
+  // Respect global API call budget (dev mode has much lower budget)
+  await waitForBudget();
+
   const token = await refreshAccessToken(userId);
 
+  trackSpotifyApiCall();
   const res = await fetch(`${SPOTIFY_API}${path}`, {
     ...options,
     headers: {
@@ -108,13 +155,8 @@ async function spotifyFetch(
   }
 
   if (res.status === 401 && retries > 0) {
-    // Force refresh and retry
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-    });
-    if (user) {
-      await db.update(users).set({ tokenExpiresAt: 0 }).where(eq(users.id, userId));
-    }
+    // Force refresh and retry — but if the token is permanently invalid, bail
+    await db.update(users).set({ tokenExpiresAt: 0 }).where(eq(users.id, userId));
     return spotifyFetch(userId, path, options, retries - 1);
   }
 
@@ -177,7 +219,13 @@ export async function uploadPlaylistImage(
   playlistId: string,
   base64Jpeg: string
 ): Promise<void> {
+  // Image upload has its own custom rate limit on Spotify's side.
+  // We still track it against our global budget and respect rate limits.
+  await waitForBudget();
+
   const token = await refreshAccessToken(userId);
+
+  trackSpotifyApiCall();
   const res = await fetch(`${SPOTIFY_API}/playlists/${playlistId}/images`, {
     method: 'PUT',
     headers: {
@@ -186,6 +234,13 @@ export async function uploadPlaylistImage(
     },
     body: base64Jpeg,
   });
+
+  if (res.status === 429) {
+    const retryAfter = Number.parseInt(res.headers.get('Retry-After') || '5', 10);
+    rateLimitedUntil = Date.now() + retryAfter * 1000;
+    throw new Error(`Playlist image upload rate-limited, retry after ${retryAfter}s`);
+  }
+
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to upload playlist image: ${res.status} ${err}`);
@@ -193,14 +248,32 @@ export async function uploadPlaylistImage(
 }
 
 export async function followPlaylist(userId: string, playlistId: string): Promise<void> {
-  const res = await spotifyFetch(userId, `/me/library`, {
+  const res = await spotifyFetch(userId, `/playlists/${playlistId}/followers`, {
     method: 'PUT',
-    body: JSON.stringify({ ids: [playlistId] }),
+    body: JSON.stringify({ public: false }),
   });
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to follow playlist: ${res.status} ${err}`);
   }
+}
+
+export async function getPlaylistDetails(
+  userId: string,
+  playlistId: string
+): Promise<{ name: string; description: string | null; imageUrl: string | null }> {
+  const res = await spotifyFetch(userId, `/playlists/${playlistId}?fields=name,description,images`);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to get playlist details: ${res.status} ${err}`);
+  }
+  const data: { name: string; description: string | null; images: Array<{ url: string }> } =
+    await res.json();
+  return {
+    name: data.name,
+    description: data.description || null,
+    imageUrl: data.images?.[0]?.url || null,
+  };
 }
 
 export async function getPlaylistItems(
@@ -289,7 +362,7 @@ export async function getRecentlyPlayed(
 export async function searchTracks(
   userId: string,
   query: string,
-  limit = 10
+  limit = spotifyConfig.searchLimit
 ): Promise<SpotifyTrack[]> {
   const params = new URLSearchParams({
     q: query,
@@ -322,14 +395,15 @@ export async function getCurrentPlayback(
 
 export async function startPlayback(
   userId: string,
-  options: { contextUri: string; trackUri: string }
+  options: { contextUri?: string; trackUri: string }
 ): Promise<Response> {
+  const body = options.contextUri
+    ? { context_uri: options.contextUri, offset: { uri: options.trackUri } }
+    : { uris: [options.trackUri] };
+
   return spotifyFetch(userId, '/me/player/play', {
     method: 'PUT',
-    body: JSON.stringify({
-      context_uri: options.contextUri,
-      offset: { uri: options.trackUri },
-    }),
+    body: JSON.stringify(body),
   });
 }
 

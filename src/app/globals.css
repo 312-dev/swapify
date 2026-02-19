@@ -3,21 +3,22 @@
 @import 'shadcn/tailwind.css';
 
 :root {
-  /* Swapify design tokens */
-  --spotify-green: #1db954;
-  --spotify-green-hover: #1ed760;
+  /* Swapify design tokens — Arctic Aurora palette */
+  --brand: #38bdf8;
+  --brand-hover: #7dd3fc;
+  --accent-green: #4ade80;
   --card-bg: #181818;
   --card-hover: #282828;
   --danger: #e74c3c;
-  --bg-gradient-start: #1a3a2a;
+  --bg-gradient-start: #081420;
   --bg-gradient-end: #0a0a0a;
   --glass-bg: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-bg-hover: rgba(255, 255, 255, 0.1);
   --surface-elevated: #1a1a1a;
   --text-primary: #ffffff;
-  --text-secondary: #a7a7a7;
-  --text-tertiary: #6a6a6a;
+  --text-secondary: #b5b5b5;
+  --text-tertiary: #787878;
   --bottom-nav-height: 5rem;
 
   /* shadcn semantic tokens — mapped to dark theme */
@@ -28,7 +29,7 @@
   --card-foreground: var(--text-primary);
   --popover: var(--surface-elevated);
   --popover-foreground: var(--text-primary);
-  --primary: var(--spotify-green);
+  --primary: var(--brand);
   --primary-foreground: #000000;
   --secondary: var(--glass-bg);
   --secondary-foreground: var(--text-primary);
@@ -39,13 +40,14 @@
   --destructive: var(--danger);
   --border: var(--glass-border);
   --input: var(--glass-border);
-  --ring: var(--spotify-green);
+  --ring: var(--brand);
 }
 
 @theme inline {
   /* Swapify design tokens */
-  --color-spotify: var(--spotify-green);
-  --color-spotify-hover: var(--spotify-green-hover);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-accent-green: var(--accent-green);
   --color-card-hover: var(--card-hover);
   --color-danger: var(--danger);
   --color-glass: var(--glass-bg);
@@ -55,7 +57,8 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-epilogue);
+  --font-display: var(--font-cal-sans);
   --font-mono: var(--font-geist-mono);
 
   /* shadcn semantic colors */
@@ -100,9 +103,11 @@ html {
 }
 
 body {
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-epilogue), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
 }
 
 /* Glassmorphism utility */
@@ -209,6 +214,23 @@ body {
   animation: pulse 1.5s ease-in-out infinite alternate;
 }
 
+/* Equalizer bar animation for "now listening" indicator */
+@keyframes equalizer {
+  0%,
+  100% {
+    height: 3px;
+  }
+  50% {
+    height: 12px;
+  }
+}
+
+.equalizer-bar {
+  height: 3px;
+  min-height: 3px;
+  animation: equalizer 0.8s ease-in-out infinite;
+}
+
 /* Shimmer loading skeleton */
 @keyframes shimmer {
   0% {
@@ -228,8 +250,8 @@ body {
 
 /* Drop zone styles */
 .drop-zone-active {
-  border-color: var(--spotify-green) !important;
-  background: rgba(29, 185, 84, 0.1) !important;
+  border-color: var(--brand) !important;
+  background: rgba(56, 189, 248, 0.1) !important;
 }
 
 /* Scrollbar styling (desktop) */
@@ -271,7 +293,7 @@ body {
 
 .input-glass:focus {
   outline: none;
-  border-color: var(--spotify-green);
+  border-color: var(--brand);
 }
 
 /* Pill button base */
@@ -292,12 +314,12 @@ body {
 }
 
 .btn-pill-primary {
-  background: var(--spotify-green);
+  background: var(--brand);
   color: #000;
 }
 
 .btn-pill-primary:hover {
-  background: var(--spotify-green-hover);
+  background: var(--brand-hover);
   transform: scale(1.02);
 }
 
@@ -321,9 +343,21 @@ body {
   transform: scale(0.98);
 }
 
+/* Compact size variants */
+.btn-pill-sm {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.input-glass-sm {
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
 /* Swipe action backgrounds */
 .swipe-action-positive {
-  background: linear-gradient(90deg, rgba(29, 185, 84, 0.3), rgba(29, 185, 84, 0.6));
+  background: linear-gradient(90deg, rgba(74, 222, 128, 0.3), rgba(74, 222, 128, 0.6));
 }
 
 .swipe-action-negative {
@@ -332,7 +366,33 @@ body {
 
 /* Unread tracks badge */
 .unread-badge {
-  box-shadow: 0 0 6px rgba(29, 185, 84, 0.4);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+}
+
+/* Pending reaction pulse indicator */
+@keyframes reaction-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.pending-reaction-pulse {
+  animation: reaction-pulse 2s ease-in-out infinite;
+}
+
+/* Landing page hero glow */
+.landing-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(56, 189, 248, 0.15) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(74, 222, 128, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 50% 80%, rgba(56, 189, 248, 0.08) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 @layer base {

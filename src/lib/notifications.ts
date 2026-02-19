@@ -3,6 +3,11 @@ import { db } from '@/db';
 import { pushSubscriptions, users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { sendEmail } from './email';
+import {
+  type NotificationType,
+  parseNotificationPrefs,
+  isNotificationEnabled,
+} from './notification-prefs';
 
 // Configure web-push with VAPID keys
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -19,27 +24,37 @@ interface NotificationPayload {
   url?: string;
 }
 
-export async function notify(userId: string, payload: NotificationPayload): Promise<void> {
+export async function notify(
+  userId: string,
+  payload: NotificationPayload,
+  type?: NotificationType
+): Promise<void> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
   if (!user) return;
 
-  // Send push notification if enabled
-  if (user.notifyPush) {
+  const prefs = parseNotificationPrefs(user.notificationPrefs);
+
+  // Send push notification if master toggle + per-type pref both enabled
+  const pushEnabled = user.notifyPush && (!type || isNotificationEnabled(prefs, type, 'push'));
+  if (pushEnabled) {
     await sendPushNotification(userId, payload);
   }
 
-  // Send email notification if enabled and email is set
-  if (user.notifyEmail && user.email) {
-    await sendEmail(user.email, payload.title, payload.body, payload.url);
+  // Send email notification if master toggle + per-type pref both enabled + email is set
+  const emailEnabled =
+    user.notifyEmail && user.email && (!type || isNotificationEnabled(prefs, type, 'email'));
+  if (emailEnabled) {
+    await sendEmail(user.email!, payload.title, payload.body, payload.url, userId);
   }
 }
 
 export async function notifyPlaylistMembers(
   playlistId: string,
   excludeUserId: string,
-  payload: NotificationPayload
+  payload: NotificationPayload,
+  type?: NotificationType
 ): Promise<void> {
   const { playlistMembers } = await import('@/db/schema');
 
@@ -48,7 +63,7 @@ export async function notifyPlaylistMembers(
   });
 
   await Promise.allSettled(
-    members.filter((m) => m.userId !== excludeUserId).map((m) => notify(m.userId, payload))
+    members.filter((m) => m.userId !== excludeUserId).map((m) => notify(m.userId, payload, type))
   );
 }
 

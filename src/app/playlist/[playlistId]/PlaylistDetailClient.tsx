@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { springs } from '@/lib/motion';
+import { useAlbumColors } from '@/hooks/useAlbumColors';
 import TrackCard from '@/components/TrackCard';
 import TrackSearch from '@/components/TrackSearch';
 import SwipeableTrackCard from '@/components/SwipeableTrackCard';
-import AlbumArt from '@/components/AlbumArt';
 import ShareSheet from '@/components/ShareSheet';
 import EditDetailsModal from '@/components/EditDetailsModal';
+import PlaylistTabs from '@/components/PlaylistTabs';
+import LikedTracksView from '@/components/LikedTracksView';
+import OutcastTracksView from '@/components/OutcastTracksView';
 import { Crown } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -22,6 +27,8 @@ interface PlaylistDetailClientProps {
   ownerId: string;
   currentUserId: string;
   spotifyPlaylistId: string;
+  vibeName: string | null;
+  ownerSpotifyClientId?: string;
 }
 
 interface TrackData {
@@ -56,22 +63,38 @@ interface TrackData {
     isAuto: boolean;
     createdAt: string;
   }>;
-}
-
-interface PreviousTrack {
-  id: string;
-  spotifyTrackId: string;
-  trackName: string;
-  artistName: string;
-  albumImageUrl: string | null;
-  addedBy: {
+  activeListeners: Array<{
     id: string;
     displayName: string;
     avatarUrl: string | null;
-  };
+    progressMs: number;
+    durationMs: number;
+    capturedAt: number;
+  }>;
+}
+
+interface LikedTrack {
+  spotifyTrackId: string;
+  spotifyTrackUri: string;
+  trackName: string;
+  artistName: string;
+  albumImageUrl: string | null;
+  addedBy: { id: string; displayName: string; avatarUrl: string | null };
   addedAt: string;
-  removedAt: string;
-  archivedAt: string | null;
+  removedAt: string | null;
+  isActive: boolean;
+}
+
+interface OutcastTrack {
+  spotifyTrackId: string;
+  spotifyTrackUri: string;
+  trackName: string;
+  artistName: string;
+  albumImageUrl: string | null;
+  addedBy: { id: string; displayName: string; avatarUrl: string | null };
+  addedAt: string;
+  removedAt: string | null;
+  reaction: string | null;
 }
 
 export default function PlaylistDetailClient({
@@ -84,24 +107,30 @@ export default function PlaylistDetailClient({
   ownerId,
   currentUserId,
   spotifyPlaylistId,
+  vibeName,
+  ownerSpotifyClientId,
 }: PlaylistDetailClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [tracks, setTracks] = useState<TrackData[]>([]);
-  const [previousTracks, setPreviousTracks] = useState<PreviousTrack[]>([]);
   const [members, setMembers] = useState<
     Array<{ id: string; displayName: string; avatarUrl: string | null }>
   >([]);
-  const [showPrevious, setShowPrevious] = useState(false);
-  const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({});
-  const [savingTrack, setSavingTrack] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'inbox' | 'liked' | 'outcasts'>('inbox');
+  const [likedTracks, setLikedTracks] = useState<LikedTrack[]>([]);
+  const [outcastTracks, setOutcastTracks] = useState<OutcastTrack[]>([]);
+  const [likedPlaylistId, setLikedPlaylistId] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showEditDetails, setShowEditDetails] = useState(false);
   const [currentName, setCurrentName] = useState(playlistName);
   const [currentDescription, setCurrentDescription] = useState(playlistDescription);
   const [currentImageUrl, setCurrentImageUrl] = useState(playlistImageUrl);
+  const [currentVibeName, setCurrentVibeName] = useState(vibeName);
   const [syncing, setSyncing] = useState(false);
-  const [sorting, setSorting] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
+  const albumColors = useAlbumColors(currentImageUrl);
 
   const fetchTracks = useCallback(async () => {
     try {
@@ -109,11 +138,16 @@ export default function PlaylistDetailClient({
       if (res.ok) {
         const data = await res.json();
         setTracks(data.tracks);
-        setPreviousTracks(data.previousTracks);
         setMembers(data.members);
+        setLikedTracks(data.likedTracks ?? []);
+        setOutcastTracks(data.outcastTracks ?? []);
+        setLikedPlaylistId(data.likedPlaylistId ?? null);
+        if (data.vibeName !== undefined) setCurrentVibeName(data.vibeName);
       }
     } catch {
       // Silently fail on refresh
+    } finally {
+      setInitialLoading(false);
     }
   }, [playlistId]);
 
@@ -124,6 +158,15 @@ export default function PlaylistDetailClient({
     return () => clearInterval(interval);
   }, [fetchTracks]);
 
+  // Auto-open share sheet when arriving from playlist creation
+  useEffect(() => {
+    if (searchParams.get('share') === '1') {
+      setShowShare(true);
+      // Clean the URL without triggering a navigation
+      window.history.replaceState({}, '', `/playlist/${playlistId}`);
+    }
+  }, [searchParams, playlistId]);
+
   async function syncFromSpotify() {
     setSyncing(true);
     try {
@@ -131,90 +174,19 @@ export default function PlaylistDetailClient({
         method: 'POST',
       });
       if (res.ok) {
+        const data = await res.json();
+        if (data.metadata) {
+          if (data.metadata.name !== undefined) setCurrentName(data.metadata.name);
+          if (data.metadata.description !== undefined)
+            setCurrentDescription(data.metadata.description);
+          if (data.metadata.imageUrl !== undefined) setCurrentImageUrl(data.metadata.imageUrl);
+        }
         await fetchTracks();
       }
     } catch {
       // Silently fail
     } finally {
       setSyncing(false);
-    }
-  }
-
-  async function sortByVibe() {
-    setSorting(true);
-    try {
-      const res = await fetch(`/api/playlists/${playlistId}/tracks/sort-by-vibe`, {
-        method: 'POST',
-      });
-      if (res.ok) {
-        await fetchTracks();
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to sort tracks');
-      }
-    } catch {
-      toast.error('Failed to sort tracks by vibe');
-    } finally {
-      setSorting(false);
-    }
-  }
-
-  // Stable key derived from previous track IDs — only re-fetch when the actual
-  // set of tracks changes, not on every polling reference change.
-  const previousTrackIds = useMemo(
-    () => previousTracks.map((t) => t.spotifyTrackId).join(','),
-    [previousTracks]
-  );
-
-  // Fetch saved status when previously played section is expanded
-  useEffect(() => {
-    if (!showPrevious || !previousTrackIds) return;
-    let stale = false;
-    const ids = previousTrackIds.split(',');
-    // Batch in groups of 50 (Spotify limit)
-    async function fetchSaved() {
-      const result: Record<string, boolean> = {};
-      for (let i = 0; i < ids.length; i += 50) {
-        const batch = ids.slice(i, i + 50);
-        try {
-          const res = await fetch(`/api/library?ids=${batch.join(',')}`, {
-            cache: 'no-store',
-          });
-          if (res.ok) {
-            const data = await res.json();
-            Object.assign(result, data);
-          }
-        } catch {
-          // On error, don't overwrite existing state
-          return;
-        }
-      }
-      if (!stale) {
-        setSavedStatus((prev) => ({ ...prev, ...result }));
-      }
-    }
-    fetchSaved();
-    return () => {
-      stale = true;
-    };
-  }, [showPrevious, previousTrackIds]);
-
-  async function toggleSaved(spotifyTrackId: string) {
-    const isSaved = savedStatus[spotifyTrackId];
-    setSavingTrack(spotifyTrackId);
-    try {
-      const res = await fetch('/api/library', {
-        method: isSaved ? 'DELETE' : 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [spotifyTrackId] }),
-      });
-      if (res.ok) {
-        setSavedStatus((prev) => ({ ...prev, [spotifyTrackId]: !isSaved }));
-      }
-    } catch {
-      // Silently fail
-    } finally {
-      setSavingTrack(null);
     }
   }
 
@@ -305,14 +277,24 @@ export default function PlaylistDetailClient({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Gradient header */}
-      <div className="gradient-bg-radial px-5 pt-8 pb-6">
+      {/* Gradient header — dynamic album colors or fallback */}
+      <div
+        className={albumColors.isExtracted ? 'px-5 pt-8 pb-6' : 'gradient-bg-radial px-5 pt-8 pb-6'}
+        style={
+          albumColors.isExtracted
+            ? {
+                backgroundImage: albumColors.backgroundImage,
+                backgroundColor: '#0a0a0a',
+              }
+            : undefined
+        }
+      >
         {/* Top bar: back + settings */}
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => window.history.back()}
+            onClick={() => router.back()}
             className="text-text-secondary hover:text-text-primary transition-colors"
-            data-tooltip="Go back"
+            aria-label="Go back"
           >
             <svg
               width="24"
@@ -327,10 +309,10 @@ export default function PlaylistDetailClient({
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <a
+          <Link
             href={`/playlist/${playlistId}/settings`}
             className="text-text-secondary hover:text-text-primary transition-colors"
-            data-tooltip="Settings"
+            aria-label="Settings"
           >
             <svg
               width="22"
@@ -345,7 +327,7 @@ export default function PlaylistDetailClient({
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-          </a>
+          </Link>
         </div>
 
         {/* Cover + Info centered layout */}
@@ -368,8 +350,12 @@ export default function PlaylistDetailClient({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-spotify/20 to-transparent">
-                    <svg className="w-14 h-14 text-spotify/40" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand/20 to-transparent">
+                    <svg
+                      className="w-14 h-14 text-brand/40"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
                       <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                     </svg>
                   </div>
@@ -377,7 +363,12 @@ export default function PlaylistDetailClient({
               </div>
               <span className="text-3xl font-bold text-text-primary">{currentName}</span>
               {currentDescription && (
-                <span className="text-base text-text-secondary mt-1 max-w-xs">{currentDescription}</span>
+                <span className="text-base text-text-secondary mt-1 max-w-xs">
+                  {currentDescription}
+                </span>
+              )}
+              {currentVibeName && tracks.length > 3 && (
+                <span className="text-sm text-brand/80 italic mt-1.5">{currentVibeName}</span>
               )}
             </button>
           ) : (
@@ -393,8 +384,12 @@ export default function PlaylistDetailClient({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-spotify/20 to-transparent">
-                    <svg className="w-14 h-14 text-spotify/40" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand/20 to-transparent">
+                    <svg
+                      className="w-14 h-14 text-brand/40"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
                       <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                     </svg>
                   </div>
@@ -403,6 +398,9 @@ export default function PlaylistDetailClient({
               <h1 className="text-3xl font-bold text-text-primary">{currentName}</h1>
               {currentDescription && (
                 <p className="text-base text-text-secondary mt-1 max-w-xs">{currentDescription}</p>
+              )}
+              {currentVibeName && tracks.length > 3 && (
+                <p className="text-sm text-brand/80 italic mt-1.5">{currentVibeName}</p>
               )}
             </>
           )}
@@ -440,7 +438,7 @@ export default function PlaylistDetailClient({
             <button
               onClick={syncFromSpotify}
               disabled={syncing}
-              className="btn-pill-secondary text-sm! py-2! px-4! gap-1.5! disabled:opacity-50"
+              className="btn-pill-secondary btn-pill-sm gap-1.5 disabled:opacity-50"
             >
               <svg
                 className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`}
@@ -457,183 +455,106 @@ export default function PlaylistDetailClient({
               </svg>
               Sync
             </button>
-            {isOwner && tracks.length >= 2 && (
-              <button
-                onClick={sortByVibe}
-                disabled={sorting}
-                className="btn-pill-secondary text-sm! py-2! px-4! disabled:opacity-50"
-              >
-                {sorting ? 'Sorting...' : 'Vibe sort'}
-              </button>
-            )}
-            <button
-              onClick={() => setShowShare(true)}
-              className="btn-pill-secondary text-sm! py-2! px-4!"
-            >
+            <button onClick={() => setShowShare(true)} className="btn-pill-secondary btn-pill-sm">
               Share
             </button>
           </div>
         </div>
       </div>
 
-      {/* Drag & drop hint */}
-      {isDragOver && (
-        <div className="mx-5 mt-4 border-2 border-dashed border-spotify rounded-xl p-8 text-center bg-spotify/5">
-          <p className="text-spotify font-medium">Drop a Spotify track link here</p>
-        </div>
-      )}
+      {/* Tab bar */}
+      <PlaylistTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        inboxCount={
+          tracks.filter((t) => {
+            if (t.addedBy.id === currentUserId) return false;
+            const myProgress = t.progress.find((p) => p.id === currentUserId);
+            return !myProgress?.hasListened;
+          }).length
+        }
+        likedCount={likedTracks.length}
+        outcastCount={outcastTracks.length}
+      />
 
-      {/* Track search */}
-      <div className="px-5 mt-4 mb-4">
-        <TrackSearch playlistId={playlistId} onTrackAdded={fetchTracks} />
-      </div>
+      {activeTab === 'inbox' && (
+        <>
+          {/* Drag & drop hint */}
+          {isDragOver && (
+            <div className="mx-5 mt-4 border-2 border-dashed border-brand rounded-xl p-8 text-center bg-brand/5">
+              <p className="text-brand font-medium">Drop a Spotify track link here</p>
+            </div>
+          )}
 
-      {/* Active tracks */}
-      <div className="px-4 space-y-2">
-        {tracks.length === 0 ? (
-          <div className="text-center py-12 text-text-tertiary">
-            <p className="text-base">No tracks yet. Search above to add one.</p>
+          {/* Track search */}
+          <div className="px-5 mt-4 mb-4">
+            <TrackSearch playlistId={playlistId} onTrackAdded={fetchTracks} />
           </div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {tracks.map((track) => (
-              <motion.div
-                key={track.id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={springs.gentle}
-              >
-                <SwipeableTrackCard
-                  onSwipeRight={() => handleReaction(track.spotifyTrackId, 'thumbs_up')}
-                  onSwipeLeft={() => handleReaction(track.spotifyTrackId, 'thumbs_down')}
-                  onReaction={(reaction) => handleReaction(track.spotifyTrackId, reaction)}
-                  disabled={track.addedBy.id === currentUserId}
-                  currentReaction={
-                    track.reactions.find((r) => r.userId === currentUserId)?.reaction ?? null
-                  }
-                >
-                  <TrackCard
-                    track={track}
-                    playlistId={playlistId}
-                    currentUserId={currentUserId}
-                    spotifyTrackUri={track.spotifyTrackUri}
-                    spotifyPlaylistUri={`spotify:playlist:${spotifyPlaylistId}`}
-                  />
-                </SwipeableTrackCard>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        )}
-      </div>
 
-      {/* Previously played */}
-      {previousTracks.length > 0 && (
-        <div className="px-5 mt-8 pb-8">
-          <button
-            onClick={() => setShowPrevious(!showPrevious)}
-            className="flex items-center gap-2 text-base text-text-secondary hover:text-text-primary transition-colors mb-3"
-          >
-            <svg
-              className={`w-4 h-4 transition-transform duration-200 ${
-                showPrevious ? 'rotate-90' : ''
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            Previously Played ({previousTracks.length})
-          </button>
-
-          <AnimatePresence>
-            {showPrevious && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-2 overflow-hidden"
-              >
-                {previousTracks.map((track) => (
-                  <div key={track.id} className="glass rounded-xl p-3 flex items-center gap-3">
-                    <AlbumArt
-                      src={track.albumImageUrl}
-                      alt={track.trackName}
-                      className="w-10 h-10 rounded-lg grayscale"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-base truncate text-text-primary">{track.trackName}</p>
-                      <p className="text-sm text-text-secondary truncate">
-                        {track.artistName} &middot; Added by {track.addedBy.displayName}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {track.archivedAt && (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-spotify/15 text-spotify">
-                          Kept
-                        </span>
-                      )}
-                      <button
-                        onClick={() => toggleSaved(track.spotifyTrackId)}
-                        disabled={savingTrack === track.spotifyTrackId}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                          savingTrack === track.spotifyTrackId
-                            ? 'opacity-50'
-                            : savedStatus[track.spotifyTrackId]
-                              ? 'bg-spotify/20 text-spotify hover:bg-spotify/30'
-                              : 'bg-white/5 text-text-tertiary hover:bg-white/10 hover:text-text-secondary'
-                        }`}
-                        data-tooltip={
-                          savedStatus[track.spotifyTrackId]
-                            ? 'Remove from library'
-                            : 'Save to library'
-                        }
-                      >
-                        {savedStatus[track.spotifyTrackId] ? (
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                        ) : (
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                        )}
-                      </button>
-                      <span
-                        className="text-sm text-text-tertiary"
-                        data-tooltip={`Removed ${new Date(track.removedAt).toLocaleString()}`}
-                      >
-                        {new Date(track.removedAt).toLocaleDateString()}
-                      </span>
-                    </div>
+          {/* Active tracks */}
+          <div className="px-4 space-y-2">
+            {initialLoading ? (
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="glass rounded-xl p-3 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg skeleton shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 skeleton w-3/5" />
+                    <div className="h-3 skeleton w-2/5" />
                   </div>
+                </div>
+              ))
+            ) : tracks.length === 0 ? (
+              <div className="text-center py-12 text-text-tertiary">
+                <p className="text-base">No tracks yet. Search above to add one.</p>
+              </div>
+            ) : (
+              <AnimatePresence mode="popLayout">
+                {tracks.map((track) => (
+                  <motion.div
+                    key={track.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={springs.gentle}
+                  >
+                    <SwipeableTrackCard
+                      onSwipeRight={() => handleReaction(track.spotifyTrackId, 'thumbs_up')}
+                      onSwipeLeft={() => handleReaction(track.spotifyTrackId, 'thumbs_down')}
+                      onReaction={(reaction) => handleReaction(track.spotifyTrackId, reaction)}
+                      disabled={track.addedBy.id === currentUserId}
+                      currentReaction={
+                        track.reactions.find((r) => r.userId === currentUserId)?.reaction ?? null
+                      }
+                    >
+                      <TrackCard
+                        track={track}
+                        activeListeners={track.activeListeners}
+                        playlistId={playlistId}
+                        currentUserId={currentUserId}
+                        spotifyTrackUri={track.spotifyTrackUri}
+                        spotifyPlaylistUri={`spotify:playlist:${spotifyPlaylistId}`}
+                      />
+                    </SwipeableTrackCard>
+                  </motion.div>
                 ))}
-              </motion.div>
+              </AnimatePresence>
             )}
-          </AnimatePresence>
-        </div>
+          </div>
+        </>
       )}
+
+      {activeTab === 'liked' && (
+        <LikedTracksView
+          playlistId={playlistId}
+          likedTracks={likedTracks}
+          likedPlaylistId={likedPlaylistId}
+          onPlaylistCreated={(id) => setLikedPlaylistId(id)}
+        />
+      )}
+
+      {activeTab === 'outcasts' && <OutcastTracksView outcastTracks={outcastTracks} />}
+
       {/* Share sheet */}
       <ShareSheet
         isOpen={showShare}
@@ -641,6 +562,7 @@ export default function PlaylistDetailClient({
         inviteCode={inviteCode}
         playlistId={playlistId}
         playlistName={currentName}
+        ownerSpotifyClientId={ownerSpotifyClientId}
       />
 
       {/* Edit details modal */}

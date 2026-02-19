@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -34,6 +32,4 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          NEXT_PUBLIC_BASE_URL: https://swapify.312.dev
+          NEXT_PUBLIC_APP_URL: https://swapify.312.dev

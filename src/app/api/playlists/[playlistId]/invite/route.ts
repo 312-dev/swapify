@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { db } from '@/db';
 import { playlists, playlistMembers, emailInvites } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -14,6 +15,10 @@ export async function POST(
   { params }: { params: Promise<{ playlistId: string }> }
 ) {
   const user = await requireAuth();
+
+  const limited = checkRateLimit(`invite:${user.id}`, RATE_LIMITS.invite);
+  if (limited) return limited;
+
   const { playlistId } = await params;
 
   const body = await request.json();
