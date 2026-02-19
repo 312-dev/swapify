@@ -36,6 +36,20 @@
       "when": 1771800000000,
       "tag": "0010_add_spotify_client_id",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771900000000,
+      "tag": "0011_add_circles",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771950000000,
+      "tag": "0012_add_circle_image",
+      "breakpoints": true
     }
   ]
 }

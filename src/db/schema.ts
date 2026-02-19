@@ -2,6 +2,7 @@ import { pgTable, text, integer, uniqueIndex, boolean, timestamp } from 'drizzle
 import { relations } from 'drizzle-orm';
 
 // ─── Users ───────────────────────────────────────────────────────────────────
+// Profile-only table. Spotify tokens live in circle_members (per-circle).
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   spotifyId: text('spotify_id').notNull().unique(),
@@ -16,14 +17,51 @@ export const users = pgTable('users', {
   notificationPrefs: text('notification_prefs'), // JSON: per-type channel prefs
   autoNegativeReactions: boolean('auto_negative_reactions').notNull().default(true),
   recentEmojis: text('recent_emojis'), // JSON array of last 3 custom emojis used
-  spotifyClientId: text('spotify_client_id'), // Spotify app client ID used to auth this user
-  accessToken: text('access_token').notNull(),
-  refreshToken: text('refresh_token').notNull(),
-  tokenExpiresAt: integer('token_expires_at').notNull(),
-  lastPollCursor: integer('last_poll_cursor'),
-  lastPlaybackJson: text('last_playback_json'), // JSON: { trackId, progressMs, durationMs, capturedAt }
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Circles ─────────────────────────────────────────────────────────────────
+// A circle groups users under a single Spotify app (client ID).
+// Each circle host registers their own Spotify developer app.
+export const circles = pgTable(
+  'circles',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    imageUrl: text('image_url'),
+    spotifyClientId: text('spotify_client_id').notNull(),
+    hostUserId: text('host_user_id')
+      .notNull()
+      .references(() => users.id),
+    inviteCode: text('invite_code').notNull().unique(),
+    maxMembers: integer('max_members').notNull().default(5),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('circles_host_user_idx').on(table.hostUserId)]
+);
+
+// ─── Circle Members ──────────────────────────────────────────────────────────
+// Per-user-per-circle Spotify OAuth tokens. Tokens live here (not on users).
+export const circleMembers = pgTable(
+  'circle_members',
+  {
+    id: text('id').primaryKey(),
+    circleId: text('circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    role: text('role').notNull().default('member'), // 'host' | 'member'
+    accessToken: text('access_token').notNull(),
+    refreshToken: text('refresh_token').notNull(),
+    tokenExpiresAt: integer('token_expires_at').notNull(),
+    lastPollCursor: integer('last_poll_cursor'),
+    lastPlaybackJson: text('last_playback_json'), // JSON: { trackId, progressMs, durationMs, capturedAt }
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('circle_members_circle_user_idx').on(table.circleId, table.userId)]
+);
 
 // ─── Playlists ──────────────────────────────────────────────────────────────
 export const playlists = pgTable('playlists', {
@@ -35,6 +73,9 @@ export const playlists = pgTable('playlists', {
   ownerId: text('owner_id')
     .notNull()
     .references(() => users.id),
+  circleId: text('circle_id')
+    .notNull()
+    .references(() => circles.id),
   inviteCode: text('invite_code').notNull().unique(),
   archivePlaylistId: text('archive_playlist_id'),
   archiveThreshold: text('archive_threshold').notNull().default('none'),
@@ -178,6 +219,8 @@ export const pushSubscriptions = pgTable(
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   ownedPlaylists: many(playlists),
+  hostedCircle: many(circles),
+  circleMemberships: many(circleMembers),
   memberships: many(playlistMembers),
   addedTracks: many(playlistTracks),
   listens: many(trackListens),
@@ -186,8 +229,20 @@ export const usersRelations = relations(users, ({ many }) => ({
   sentInvites: many(emailInvites),
 }));
 
+export const circlesRelations = relations(circles, ({ one, many }) => ({
+  host: one(users, { fields: [circles.hostUserId], references: [users.id] }),
+  members: many(circleMembers),
+  playlists: many(playlists),
+}));
+
+export const circleMembersRelations = relations(circleMembers, ({ one }) => ({
+  circle: one(circles, { fields: [circleMembers.circleId], references: [circles.id] }),
+  user: one(users, { fields: [circleMembers.userId], references: [users.id] }),
+}));
+
 export const playlistsRelations = relations(playlists, ({ one, many }) => ({
   owner: one(users, { fields: [playlists.ownerId], references: [users.id] }),
+  circle: one(circles, { fields: [playlists.circleId], references: [circles.id] }),
   members: many(playlistMembers),
   tracks: many(playlistTracks),
   emailInvites: many(emailInvites),

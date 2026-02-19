@@ -5,8 +5,13 @@ export interface SessionData {
   spotifyId?: string;
   displayName?: string;
   avatarUrl?: string;
+  activeCircleId?: string; // Currently selected circle
+  activeCircleName?: string; // For display without DB round-trip
+  // OAuth flow transient fields (cleared after callback)
   codeVerifier?: string;
   spotifyClientId?: string;
+  pendingCircleId?: string; // Circle being joined during OAuth
+  pendingCircleAction?: 'create' | 'join' | 'reauth'; // What to do in callback
   returnTo?: string;
 }
 
