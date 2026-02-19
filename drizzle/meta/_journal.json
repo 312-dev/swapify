@@ -1,61 +1,40 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1771435568183,
-      "tag": "0000_robust_overlord",
+      "version": "7",
+      "when": 1771517612891,
+      "tag": "0000_mean_selene",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "6",
-      "when": 1771445594455,
-      "tag": "0001_slimy_hedge_knight",
+      "version": "7",
+      "when": 1771518148280,
+      "tag": "0001_warm_killmonger",
       "breakpoints": true
     },
     {
       "idx": 2,
-      "version": "6",
-      "when": 1771446410166,
-      "tag": "0002_colorful_gorgon",
+      "version": "7",
+      "when": 1771600000000,
+      "tag": "0002_add_vibe_name",
       "breakpoints": true
     },
     {
       "idx": 3,
-      "version": "6",
-      "when": 1771447813789,
-      "tag": "0003_fresh_jetstream",
+      "version": "7",
+      "when": 1771700000000,
+      "tag": "0009_add_notification_prefs",
       "breakpoints": true
     },
     {
       "idx": 4,
-      "version": "6",
-      "when": 1771447838991,
-      "tag": "0004_mighty_black_widow",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1771450410754,
-      "tag": "0005_violet_mercury",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1771455600000,
-      "tag": "0006_rename_jam_to_playlist",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1771542000000,
-      "tag": "0007_add_removal_delay",
+      "version": "7",
+      "when": 1771800000000,
+      "tag": "0010_add_spotify_client_id",
       "breakpoints": true
     }
   ]

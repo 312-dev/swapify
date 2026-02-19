@@ -86,12 +86,12 @@ const insertUser = sqlite.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
-// d.nguyen96 - the playlist owner
+// d.nguyen96 - the playlist owner (avatar fetched below in async seedAllTracks)
 insertUser.run(
   ownerUserId,
   'd.nguyen96',
   'D. Nguyen',
-  null,
+  null, // avatar_url — populated async below
   null,
   1, // notify_push
   0, // notify_email
@@ -168,175 +168,137 @@ insertMember.run(nanoid(), playlistId, myUserId, thirtyMinAgo);
 
 // ─── Playlist Tracks ───────────────────────────────────────────────────────
 
-const insertTrack = sqlite.prepare(`
-  INSERT INTO playlist_tracks (id, playlist_id, spotify_track_uri, spotify_track_id, track_name, artist_name, album_name, album_image_url, duration_ms, added_by_user_id, added_at, removed_at, archived_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
+const seedTracks = [
+  {
+    uri: 'spotify:track:6guXhXMAHU4QYaEsobnS6v',
+    id: '6guXhXMAHU4QYaEsobnS6v',
+    name: 'The Unforgiven III',
+    artist: 'Metallica',
+    album: 'Death Magnetic',
+    image: 'https://i.scdn.co/image/ab67616d0000b273dfe44d577f07e08564ec73ed',
+    durationMs: 466586,
+    addedBy: ownerUserId,
+    addedAt: twentyMinAgo,
+  },
+  {
+    uri: 'spotify:track:4u7EnebtmKWzUH433cf5Qv',
+    id: '4u7EnebtmKWzUH433cf5Qv',
+    name: 'Bohemian Rhapsody',
+    artist: 'Queen',
+    album: 'A Night at the Opera',
+    image: 'https://i.scdn.co/image/ab67616d0000b273ce4f1737bc8a646c8c4bd25a',
+    durationMs: 354320,
+    addedBy: ownerUserId,
+    addedAt: fifteenMinAgo,
+  },
+  {
+    uri: 'spotify:track:5CQ30WqJwcep0pYcV4AMNc',
+    id: '5CQ30WqJwcep0pYcV4AMNc',
+    name: 'Stairway to Heaven',
+    artist: 'Led Zeppelin',
+    album: 'Led Zeppelin IV',
+    image: 'https://i.scdn.co/image/ab67616d0000b2734509204d0860cc0cc67e83dc',
+    durationMs: 482830,
+    addedBy: ownerUserId,
+    addedAt: tenMinAgo,
+  },
+  {
+    uri: 'spotify:track:40riOy7x9W7GXjyGp4pjAv',
+    id: '40riOy7x9W7GXjyGp4pjAv',
+    name: 'Hotel California',
+    artist: 'Eagles',
+    album: 'Hotel California',
+    image: 'https://i.scdn.co/image/ab67616d0000b2734637341b9f507521afa9a778',
+    durationMs: 391376,
+    addedBy: ownerUserId,
+    addedAt: fiveMinAgo,
+  },
+  {
+    uri: 'spotify:track:7HD1jkMlfB78DOCGmHbKR4',
+    id: '7HD1jkMlfB78DOCGmHbKR4',
+    name: 'Comfortably Numb',
+    artist: 'Pink Floyd',
+    album: 'The Wall',
+    image: 'https://i.scdn.co/image/ab67616d0000b273f02aa309b0e1b1a9e38e03e7',
+    durationMs: 382296,
+    addedBy: ownerUserId,
+    addedAt: twoMinAgo,
+  },
+  {
+    uri: 'spotify:track:0LN0ASTtcMNRYWfHMgsFSS',
+    id: '0LN0ASTtcMNRYWfHMgsFSS',
+    name: 'Free Bird',
+    artist: 'Lynyrd Skynyrd',
+    album: 'Pronounced Leh-Nerd Skin-Nerd',
+    image: 'https://i.scdn.co/image/ab67616d0000b273c23400f19a8b0e7ae17cda91',
+    durationMs: 548000,
+    addedBy: ownerUserId,
+    addedAt: now,
+  },
+];
 
-// Track 1: The Unforgiven III by Metallica - added by d.nguyen96
-insertTrack.run(
-  nanoid(),
-  playlistId,
-  'spotify:track:6guXhXMAHU4QYaEsobnS6v',
-  '6guXhXMAHU4QYaEsobnS6v',
-  'The Unforgiven III',
-  'Metallica',
-  'Death Magnetic',
-  'https://i.scdn.co/image/ab67616d0000b273dfe44d577f07e08564ec73ed',
-  466586,
-  ownerUserId,
-  twentyMinAgo,
-  null,
-  null
-);
-
-// Track 2: Bohemian Rhapsody - added by d.nguyen96
-insertTrack.run(
-  nanoid(),
-  playlistId,
-  'spotify:track:4u7EnebtmKWzUH433cf5Qv',
-  '4u7EnebtmKWzUH433cf5Qv',
-  'Bohemian Rhapsody',
-  'Queen',
-  'A Night at the Opera',
-  'https://i.scdn.co/image/ab67616d0000b273ce4f1737bc8a646c8c4bd25a',
-  354320,
-  ownerUserId,
-  fifteenMinAgo,
-  null,
-  null
-);
-
-// Track 3: Stairway to Heaven - added by d.nguyen96
-insertTrack.run(
-  nanoid(),
-  playlistId,
-  'spotify:track:5CQ30WqJwcep0pYcV4AMNc',
-  '5CQ30WqJwcep0pYcV4AMNc',
-  'Stairway to Heaven',
-  'Led Zeppelin',
-  'Led Zeppelin IV',
-  'https://i.scdn.co/image/ab67616d0000b2734509204d0860cc0cc67e83dc',
-  482830,
-  ownerUserId,
-  tenMinAgo,
-  null,
-  null
-);
-
-// Track 4: Hotel California - added by d.nguyen96
-insertTrack.run(
-  nanoid(),
-  playlistId,
-  'spotify:track:40riOy7x9W7GXjyGp4pjAv',
-  '40riOy7x9W7GXjyGp4pjAv',
-  'Hotel California',
-  'Eagles',
-  'Hotel California',
-  'https://i.scdn.co/image/ab67616d0000b2734637341b9f507521afa9a778',
-  391376,
-  ownerUserId,
-  fiveMinAgo,
-  null,
-  null
-);
-
-// Track 5: Comfortably Numb - added by d.nguyen96
-insertTrack.run(
-  nanoid(),
-  playlistId,
-  'spotify:track:7HD1jkMlfB78DOCGmHbKR4',
-  '7HD1jkMlfB78DOCGmHbKR4',
-  'Comfortably Numb',
-  'Pink Floyd',
-  'The Wall',
-  'https://i.scdn.co/image/ab67616d0000b273f02aa309b0e1b1a9e38e03e7',
-  382296,
-  ownerUserId,
-  twoMinAgo,
-  null,
-  null
-);
-
-// Track 6: Free Bird - added by d.nguyen96
-insertTrack.run(
-  nanoid(),
-  playlistId,
-  'spotify:track:0LN0ASTtcMNRYWfHMgsFSS',
-  '0LN0ASTtcMNRYWfHMgsFSS',
-  'Free Bird',
-  'Lynyrd Skynyrd',
-  'Pronounced Leh-Nerd Skin-Nerd',
-  'https://i.scdn.co/image/ab67616d0000b273c23400f19a8b0e7ae17cda91',
-  548000,
-  ownerUserId,
-  now, // most recent
-  null,
-  null
-);
-
-// ─── Spotify Playlist Sync ──────────────────────────────────────────────────
+// ─── Simulate Track Adds (DB + Spotify + Auto-Like) ─────────────────────────
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const SPOTIFY_ACCOUNTS = 'https://accounts.spotify.com';
 const spotifyPlaylistId = '4ZnPYsKOqPV2qP93VJDzTU';
 
-const seededTrackUris = [
-  'spotify:track:6guXhXMAHU4QYaEsobnS6v',
-  'spotify:track:4u7EnebtmKWzUH433cf5Qv',
-  'spotify:track:5CQ30WqJwcep0pYcV4AMNc',
-  'spotify:track:40riOy7x9W7GXjyGp4pjAv',
-  'spotify:track:7HD1jkMlfB78DOCGmHbKR4',
-  'spotify:track:0LN0ASTtcMNRYWfHMgsFSS',
-];
+const insertTrack = sqlite.prepare(`
+  INSERT INTO playlist_tracks (id, playlist_id, spotify_track_uri, spotify_track_id, track_name, artist_name, album_name, album_image_url, duration_ms, added_by_user_id, added_at, removed_at, archived_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
 
-async function syncTracksToSpotify() {
-  if (!savedTokens) {
-    console.log('\n  Spotify sync skipped — no saved tokens. Log in and re-run seed to sync.');
-    return;
-  }
+const insertReaction = sqlite.prepare(`
+  INSERT OR IGNORE INTO track_reactions (id, playlist_id, spotify_track_id, user_id, reaction, is_auto, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
 
-  let accessToken = savedTokens.accessToken;
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
+/** Ensure we have a valid access token, refreshing if needed. Returns null if unavailable. */
+async function getAccessToken(): Promise<string | null> {
+  if (!savedTokens) return null;
 
-  // Refresh the token if it's expired or close to expiring
   const nowSec = Math.floor(Date.now() / 1000);
-  if (savedTokens.tokenExpiresAt - nowSec < 300) {
-    if (!clientId) {
-      console.log('\n  Spotify sync skipped — SPOTIFY_CLIENT_ID not set and token expired.');
-      return;
-    }
-    console.log('  Refreshing expired token...');
-    const refreshRes = await fetch(`${SPOTIFY_ACCOUNTS}/api/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: savedTokens.refreshToken,
-        client_id: clientId,
-      }),
-    });
-    if (!refreshRes.ok) {
-      console.log(`\n  Spotify sync skipped — token refresh failed (${refreshRes.status}).`);
-      return;
-    }
-    const tokenData = await refreshRes.json();
-    accessToken = tokenData.access_token;
-    // Update the DB with the fresh token
-    sqlite
-      .prepare(
-        'UPDATE users SET access_token = ?, refresh_token = ?, token_expires_at = ? WHERE id = ?'
-      )
-      .run(
-        accessToken,
-        tokenData.refresh_token ?? savedTokens.refreshToken,
-        Math.floor(Date.now() / 1000) + tokenData.expires_in,
-        myUserId
-      );
+  if (savedTokens.tokenExpiresAt - nowSec >= 300) {
+    return savedTokens.accessToken;
   }
 
-  // Fetch existing playlist tracks
-  console.log(`\n  Syncing tracks to Spotify playlist ${spotifyPlaylistId}...`);
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  if (!clientId) {
+    console.log('  Token expired and SPOTIFY_CLIENT_ID not set — skipping Spotify calls.');
+    return null;
+  }
+
+  console.log('  Refreshing expired token...');
+  const refreshRes = await fetch(`${SPOTIFY_ACCOUNTS}/api/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: savedTokens.refreshToken,
+      client_id: clientId,
+    }),
+  });
+  if (!refreshRes.ok) {
+    console.log(`  Token refresh failed (${refreshRes.status}) — skipping Spotify calls.`);
+    return null;
+  }
+
+  const tokenData = await refreshRes.json();
+  savedTokens.accessToken = tokenData.access_token;
+  savedTokens.refreshToken = tokenData.refresh_token ?? savedTokens.refreshToken;
+  savedTokens.tokenExpiresAt = Math.floor(Date.now() / 1000) + tokenData.expires_in;
+
+  sqlite
+    .prepare(
+      'UPDATE users SET access_token = ?, refresh_token = ?, token_expires_at = ? WHERE id = ?'
+    )
+    .run(savedTokens.accessToken, savedTokens.refreshToken, savedTokens.tokenExpiresAt, myUserId);
+
+  return savedTokens.accessToken;
+}
+
+/** Get the set of track URIs already in the Spotify playlist. */
+async function getExistingSpotifyUris(accessToken: string): Promise<Set<string>> {
   const existingUris = new Set<string>();
   let url: string | null =
     `${SPOTIFY_API}/playlists/${spotifyPlaylistId}/tracks?limit=50&fields=items(track(uri)),next`;
@@ -346,8 +308,8 @@ async function syncTracksToSpotify() {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) {
-      console.log(`  Spotify sync failed — could not read playlist (${res.status}).`);
-      return;
+      console.log(`  Could not read Spotify playlist (${res.status}).`);
+      return existingUris;
     }
     const data = await res.json();
     for (const item of data.items) {
@@ -356,32 +318,166 @@ async function syncTracksToSpotify() {
     url = data.next;
   }
 
-  const missingUris = seededTrackUris.filter((uri) => !existingUris.has(uri));
+  return existingUris;
+}
 
-  if (missingUris.length === 0) {
-    console.log('  All seeded tracks already in Spotify playlist.');
-    return;
+/**
+ * Simulate adding a single track — mirrors what POST /api/playlists/[id]/tracks does:
+ * 1. Insert into DB
+ * 2. Add to Spotify playlist (if not already present)
+ * 3. Auto-like: check if other members have the track saved in their library
+ */
+async function addTrack(
+  track: (typeof seedTracks)[number],
+  accessToken: string | null,
+  existingSpotifyUris: Set<string>
+): Promise<{ addedToSpotify: boolean; autoLiked: boolean }> {
+  const result = { addedToSpotify: false, autoLiked: false };
+
+  // 1. Insert track into DB
+  insertTrack.run(
+    nanoid(),
+    playlistId,
+    track.uri,
+    track.id,
+    track.name,
+    track.artist,
+    track.album,
+    track.image,
+    track.durationMs,
+    track.addedBy,
+    track.addedAt,
+    null,
+    null
+  );
+
+  if (!accessToken) return result;
+
+  // 2. Add to Spotify playlist if missing
+  if (!existingSpotifyUris.has(track.uri)) {
+    const addRes = await fetch(`${SPOTIFY_API}/playlists/${spotifyPlaylistId}/tracks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ uris: [track.uri] }),
+    });
+    if (addRes.ok) {
+      existingSpotifyUris.add(track.uri);
+      result.addedToSpotify = true;
+    }
   }
 
-  // Add missing tracks
-  const addRes = await fetch(`${SPOTIFY_API}/playlists/${spotifyPlaylistId}/tracks`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ uris: missingUris }),
-  });
+  // 3. Auto-like: check if other members already have this track saved
+  //    (mirrors tracks/route.ts POST — check every member except the one who added it)
+  const otherMemberIds = [ownerUserId, myUserId].filter((id) => id !== track.addedBy);
+  for (const memberId of otherMemberIds) {
+    // Only grayson has real tokens — skip members with fake tokens
+    if (memberId !== myUserId) continue;
 
-  if (addRes.ok) {
-    console.log(`  Added ${missingUris.length} track(s) to Spotify playlist.`);
-  } else {
-    console.log(`  Spotify sync failed — could not add tracks (${addRes.status}).`);
+    try {
+      const res = await fetch(`${SPOTIFY_API}/me/tracks/contains?ids=${track.id}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) continue;
+
+      const [isSaved]: boolean[] = await res.json();
+      if (isSaved) {
+        insertReaction.run(
+          nanoid(),
+          playlistId,
+          track.id,
+          memberId,
+          'thumbs_up',
+          1, // is_auto
+          new Date()
+        );
+        result.autoLiked = true;
+      }
+    } catch {
+      // Token expired or rate limited — skip
+    }
+  }
+
+  return result;
+}
+
+/** Fetch a Spotify user's public profile to get their avatar URL. */
+async function fetchSpotifyAvatar(accessToken: string, spotifyId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${SPOTIFY_API}/users/${encodeURIComponent(spotifyId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      console.log(`  Could not fetch profile for ${spotifyId} (${res.status}).`);
+      return null;
+    }
+    const data = await res.json();
+    return data.images?.at(-1)?.url ?? null;
+  } catch {
+    return null;
   }
 }
 
-syncTracksToSpotify()
-  .catch((err) => console.log(`  Spotify sync error: ${err.message}`))
+async function seedAllTracks() {
+  const accessToken = await getAccessToken();
+
+  // Fetch D. Nguyen's avatar from Spotify if we have tokens
+  if (accessToken) {
+    const nguynAvatar = await fetchSpotifyAvatar(accessToken, 'd.nguyen96');
+    if (nguynAvatar) {
+      sqlite.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(nguynAvatar, ownerUserId);
+      console.log(`  Fetched avatar for d.nguyen96: ${nguynAvatar}`);
+    }
+  }
+
+  if (!accessToken) {
+    console.log(
+      '\n  No valid tokens — inserting tracks into DB only (no Spotify sync or auto-like).'
+    );
+    for (const track of seedTracks) {
+      insertTrack.run(
+        nanoid(),
+        playlistId,
+        track.uri,
+        track.id,
+        track.name,
+        track.artist,
+        track.album,
+        track.image,
+        track.durationMs,
+        track.addedBy,
+        track.addedAt,
+        null,
+        null
+      );
+    }
+    return;
+  }
+
+  console.log(`\n  Syncing to Spotify playlist ${spotifyPlaylistId}...`);
+  const existingSpotifyUris = await getExistingSpotifyUris(accessToken);
+
+  console.log('  Adding tracks one by one (DB + Spotify + auto-like)...');
+  let spotifyAdds = 0;
+  let autoLikes = 0;
+
+  for (const track of seedTracks) {
+    const { addedToSpotify, autoLiked } = await addTrack(track, accessToken, existingSpotifyUris);
+    if (addedToSpotify) spotifyAdds++;
+    if (autoLiked) autoLikes++;
+    const flags = [addedToSpotify ? '+spotify' : '', autoLiked ? '+auto-like' : '']
+      .filter(Boolean)
+      .join(' ');
+    console.log(`    ${track.name}${flags ? ` (${flags})` : ''}`);
+  }
+
+  console.log(`  ${spotifyAdds} added to Spotify, ${autoLikes} auto-liked from library.`);
+}
+
+seedAllTracks()
+  .catch((err) => console.log(`  Seed error: ${err.message}`))
   .finally(() => {
     sqlite.close();
     console.log('\nSeed complete! Restart dev server to pick up changes.');
@@ -389,5 +485,5 @@ syncTracksToSpotify()
     console.log(`  Member (grayson):    ${myUserId}`);
     console.log(`  Playlist:            ${playlistId}`);
     console.log(`  Invite code:         ${inviteCode}`);
-    console.log('  Tracks: 6 (all added by d.nguyen96)');
+    console.log(`  Tracks: ${seedTracks.length} (all added by d.nguyen96)`);
   });
