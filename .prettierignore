@@ -1,0 +1,7 @@
+.next
+out
+build
+node_modules
+coverage
+*.md
+public/sw.js

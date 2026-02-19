@@ -1,38 +1,38 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/db";
-import { jamMembers, jamTracks } from "@/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth';
+import { db } from '@/db';
+import { playlistMembers, playlistTracks } from '@/db/schema';
+import { eq, desc, inArray } from 'drizzle-orm';
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Get user's jam IDs
-  const memberships = await db.query.jamMembers.findMany({
-    where: eq(jamMembers.userId, user.id),
+  // Get user's playlist IDs
+  const memberships = await db.query.playlistMembers.findMany({
+    where: eq(playlistMembers.userId, user.id),
   });
-  const jamIds = memberships.map((m) => m.jamId);
+  const playlistIds = memberships.map((m) => m.playlistId);
 
-  if (jamIds.length === 0) {
+  if (playlistIds.length === 0) {
     return NextResponse.json({ events: [] });
   }
 
   // Get recent tracks added (last 50)
-  const recentTracks = await db.query.jamTracks.findMany({
-    where: inArray(jamTracks.jamId, jamIds),
+  const recentTracks = await db.query.playlistTracks.findMany({
+    where: inArray(playlistTracks.playlistId, playlistIds),
     with: {
       addedBy: true,
-      jam: true,
+      playlist: true,
     },
-    orderBy: desc(jamTracks.addedAt),
+    orderBy: desc(playlistTracks.addedAt),
     limit: 50,
   });
 
   // Build activity events from track additions
   const events = recentTracks.map((track) => ({
     id: `track-${track.id}`,
-    type: "track_added" as const,
+    type: 'track_added' as const,
     timestamp: track.addedAt,
     user: {
       displayName: track.addedBy.displayName,
@@ -42,8 +42,8 @@ export async function GET() {
       trackName: track.trackName,
       artistName: track.artistName,
       albumImageUrl: track.albumImageUrl,
-      jamName: track.jam.name,
-      jamId: track.jam.id,
+      playlistName: track.playlist.name,
+      playlistId: track.playlist.id,
     },
   }));
 

@@ -1,21 +1,21 @@
-import { db } from "@/db";
-import { jams, jamTracks } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
-import { reorderPlaylistTracks } from "@/lib/spotify";
-import { getVibeScores } from "@/lib/tunebat";
+import { db } from '@/db';
+import { playlists, playlistTracks } from '@/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
+import { reorderPlaylistTracks } from '@/lib/spotify';
+import { getVibeScores } from '@/lib/tunebat';
 
 /**
- * Sort a jam's active tracks by vibe (exciting → calm) on Spotify.
- * Uses the jam owner's token. Silently skips if < 2 tracks.
+ * Sort a playlist's active tracks by vibe (exciting → calm) on Spotify.
+ * Uses the playlist owner's token. Silently skips if < 2 tracks.
  */
-export async function vibeSort(jamId: string): Promise<void> {
-  const jam = await db.query.jams.findFirst({
-    where: eq(jams.id, jamId),
+export async function vibeSort(playlistId: string): Promise<void> {
+  const playlist = await db.query.playlists.findFirst({
+    where: eq(playlists.id, playlistId),
   });
-  if (!jam) return;
+  if (!playlist) return;
 
-  const tracks = await db.query.jamTracks.findMany({
-    where: and(eq(jamTracks.jamId, jamId), isNull(jamTracks.removedAt)),
+  const tracks = await db.query.playlistTracks.findMany({
+    where: and(eq(playlistTracks.playlistId, playlistId), isNull(playlistTracks.removedAt)),
   });
 
   if (tracks.length < 2) return;
@@ -35,5 +35,5 @@ export async function vibeSort(jamId: string): Promise<void> {
   });
 
   const sortedUris = sorted.map((t) => t.spotifyTrackUri);
-  await reorderPlaylistTracks(jam.ownerId, jam.spotifyPlaylistId, sortedUris);
+  await reorderPlaylistTracks(playlist.ownerId, playlist.spotifyPlaylistId, sortedUris);
 }

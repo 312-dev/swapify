@@ -22,7 +22,7 @@ export interface SpotifyTrack {
 export interface SpotifyPlaylistItem {
   added_at: string;
   added_by: { id: string; uri: string; external_urls: { spotify: string } };
-  item: SpotifyTrack;
+  track: SpotifyTrack;
 }
 
 export interface SpotifyRecentlyPlayedItem {

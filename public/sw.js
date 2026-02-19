@@ -1,4 +1,4 @@
-const CACHE_NAME = "deepdigs-v1";
+const CACHE_NAME = "swapify-v1";
 const PRECACHE_URLS = ["/", "/dashboard", "/login", "/activity", "/profile"];
 
 // Install: precache app shell
@@ -51,7 +51,7 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data.json();
   } catch {
-    data = { title: "Deep Digs", body: event.data.text() };
+    data = { title: "Swapify", body: event.data.text() };
   }
 
   const options = {

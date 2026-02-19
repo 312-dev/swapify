@@ -1,13 +1,13 @@
-import webpush from "web-push";
-import { db } from "@/db";
-import { pushSubscriptions, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { sendEmail } from "./email";
+import webpush from 'web-push';
+import { db } from '@/db';
+import { pushSubscriptions, users } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { sendEmail } from './email';
 
 // Configure web-push with VAPID keys
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:noreply@deepdigs.app",
+    process.env.VAPID_SUBJECT || 'mailto:noreply@swapify.app',
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );
@@ -19,10 +19,7 @@ interface NotificationPayload {
   url?: string;
 }
 
-export async function notify(
-  userId: string,
-  payload: NotificationPayload
-): Promise<void> {
+export async function notify(userId: string, payload: NotificationPayload): Promise<void> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
@@ -39,28 +36,23 @@ export async function notify(
   }
 }
 
-export async function notifyJamMembers(
-  jamId: string,
+export async function notifyPlaylistMembers(
+  playlistId: string,
   excludeUserId: string,
   payload: NotificationPayload
 ): Promise<void> {
-  const { jamMembers } = await import("@/db/schema");
+  const { playlistMembers } = await import('@/db/schema');
 
-  const members = await db.query.jamMembers.findMany({
-    where: eq(jamMembers.jamId, jamId),
+  const members = await db.query.playlistMembers.findMany({
+    where: eq(playlistMembers.playlistId, playlistId),
   });
 
   await Promise.allSettled(
-    members
-      .filter((m) => m.userId !== excludeUserId)
-      .map((m) => notify(m.userId, payload))
+    members.filter((m) => m.userId !== excludeUserId).map((m) => notify(m.userId, payload))
   );
 }
 
-async function sendPushNotification(
-  userId: string,
-  payload: NotificationPayload
-): Promise<void> {
+async function sendPushNotification(userId: string, payload: NotificationPayload): Promise<void> {
   const subs = await db.query.pushSubscriptions.findMany({
     where: eq(pushSubscriptions.userId, userId),
   });
@@ -81,13 +73,11 @@ async function sendPushNotification(
       // If subscription is expired (410 Gone), remove it
       if (
         error &&
-        typeof error === "object" &&
-        "statusCode" in error &&
+        typeof error === 'object' &&
+        'statusCode' in error &&
         (error as { statusCode: number }).statusCode === 410
       ) {
-        await db
-          .delete(pushSubscriptions)
-          .where(eq(pushSubscriptions.id, sub.id));
+        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
       }
     }
   }

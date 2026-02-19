@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: "./data/jamjar.db",
+    url: process.env.DATABASE_PATH ?? "./data/swapify.db",
   },
 });

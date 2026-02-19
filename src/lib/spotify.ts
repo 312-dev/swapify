@@ -1,6 +1,6 @@
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { db } from '@/db';
+import { users } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import type {
   SpotifyTokenResponse,
   SpotifyUser,
@@ -8,12 +8,11 @@ import type {
   SpotifyPlaylist,
   SpotifyRecentlyPlayedItem,
   SpotifySearchResult,
-  SpotifyPaginatedResponse,
   SpotifyPlaylistItem,
-} from "@/types/spotify";
+} from '@/types/spotify';
 
-const SPOTIFY_API = "https://api.spotify.com/v1";
-const SPOTIFY_ACCOUNTS = "https://accounts.spotify.com";
+const SPOTIFY_API = 'https://api.spotify.com/v1';
+const SPOTIFY_ACCOUNTS = 'https://accounts.spotify.com';
 
 // ─── Token Management ────────────────────────────────────────────────────────
 
@@ -31,10 +30,10 @@ export async function refreshAccessToken(userId: string): Promise<string> {
   }
 
   const res = await fetch(`${SPOTIFY_ACCOUNTS}/api/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: "refresh_token",
+      grant_type: 'refresh_token',
       refresh_token: user.refreshToken,
       client_id: process.env.SPOTIFY_CLIENT_ID!,
     }),
@@ -93,13 +92,13 @@ async function spotifyFetch(
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...options.headers,
     },
   });
 
   if (res.status === 429) {
-    const retryAfter = parseInt(res.headers.get("Retry-After") || "1", 10);
+    const retryAfter = parseInt(res.headers.get('Retry-After') || '1', 10);
     // Set app-level cooldown so other callers also back off
     rateLimitedUntil = Date.now() + retryAfter * 1000;
     if (retries > 0) {
@@ -114,10 +113,7 @@ async function spotifyFetch(
       where: eq(users.id, userId),
     });
     if (user) {
-      await db
-        .update(users)
-        .set({ tokenExpiresAt: 0 })
-        .where(eq(users.id, userId));
+      await db.update(users).set({ tokenExpiresAt: 0 }).where(eq(users.id, userId));
     }
     return spotifyFetch(userId, path, options, retries - 1);
   }
@@ -127,9 +123,7 @@ async function spotifyFetch(
 
 // ─── User ────────────────────────────────────────────────────────────────────
 
-export async function getSpotifyProfile(
-  accessToken: string
-): Promise<SpotifyUser> {
+export async function getSpotifyProfile(accessToken: string): Promise<SpotifyUser> {
   const res = await fetch(`${SPOTIFY_API}/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -146,19 +140,15 @@ export async function createPlaylist(
   options?: { collaborative?: boolean }
 ): Promise<SpotifyPlaylist> {
   const collaborative = options?.collaborative ?? true;
-  const res = await spotifyFetch(
-    userId,
-    `/me/playlists`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        description: description || "A Deep Digs collaborative playlist",
-        public: false,
-        collaborative,
-      }),
-    }
-  );
+  const res = await spotifyFetch(userId, `/me/playlists`, {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      description: description || 'A Swapify collaborative playlist',
+      public: false,
+      collaborative,
+    }),
+  });
 
   if (!res.ok) {
     const err = await res.text();
@@ -173,7 +163,7 @@ export async function updatePlaylistDetails(
   details: { name?: string; description?: string }
 ): Promise<void> {
   const res = await spotifyFetch(userId, `/playlists/${playlistId}`, {
-    method: "PUT",
+    method: 'PUT',
     body: JSON.stringify(details),
   });
   if (!res.ok) {
@@ -188,35 +178,25 @@ export async function uploadPlaylistImage(
   base64Jpeg: string
 ): Promise<void> {
   const token = await refreshAccessToken(userId);
-  const res = await fetch(
-    `${SPOTIFY_API}/playlists/${playlistId}/images`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "image/jpeg",
-      },
-      body: base64Jpeg,
-    }
-  );
+  const res = await fetch(`${SPOTIFY_API}/playlists/${playlistId}/images`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'image/jpeg',
+    },
+    body: base64Jpeg,
+  });
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to upload playlist image: ${res.status} ${err}`);
   }
 }
 
-export async function followPlaylist(
-  userId: string,
-  playlistId: string
-): Promise<void> {
-  const res = await spotifyFetch(
-    userId,
-    `/me/library`,
-    {
-      method: "PUT",
-      body: JSON.stringify({ ids: [playlistId] }),
-    }
-  );
+export async function followPlaylist(userId: string, playlistId: string): Promise<void> {
+  const res = await spotifyFetch(userId, `/me/library`, {
+    method: 'PUT',
+    body: JSON.stringify({ ids: [playlistId] }),
+  });
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to follow playlist: ${res.status} ${err}`);
@@ -236,14 +216,13 @@ export async function getPlaylistItems(
       const err = await res.text();
       throw new Error(`Failed to get playlist items: ${res.status} ${err}`);
     }
-    const data: { items: SpotifyPlaylistItem[]; next: string | null } =
-      await res.json();
-    allItems.push(...data.items.filter((i) => i.item));
+    const data: { items: SpotifyPlaylistItem[]; next: string | null } = await res.json();
+    allItems.push(...data.items.filter((i) => i.track));
     // next is a full URL, extract the path
     if (data.next) {
-      url = data.next.replace("https://api.spotify.com/v1", "");
+      url = data.next.replace('https://api.spotify.com/v1', '');
     } else {
-      url = "";
+      url = '';
     }
   }
 
@@ -258,7 +237,7 @@ export async function addItemsToPlaylist(
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
   const res = await spotifyFetch(userId, `/playlists/${playlistId}/items`, {
-    method: "POST",
+    method: 'POST',
     body: JSON.stringify({ uris }),
   });
   if (!res.ok) {
@@ -274,7 +253,7 @@ export async function removeItemsFromPlaylist(
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
   const res = await spotifyFetch(userId, `/playlists/${playlistId}/items`, {
-    method: "DELETE",
+    method: 'DELETE',
     body: JSON.stringify({
       tracks: uris.map((uri) => ({ uri })),
     }),
@@ -292,13 +271,10 @@ export async function getRecentlyPlayed(
   userId: string,
   after?: number
 ): Promise<SpotifyRecentlyPlayedItem[]> {
-  const params = new URLSearchParams({ limit: "50" });
-  if (after) params.set("after", after.toString());
+  const params = new URLSearchParams({ limit: '50' });
+  if (after) params.set('after', after.toString());
 
-  const res = await spotifyFetch(
-    userId,
-    `/me/player/recently-played?${params}`
-  );
+  const res = await spotifyFetch(userId, `/me/player/recently-played?${params}`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get recently played: ${res.status} ${err}`);
@@ -317,7 +293,7 @@ export async function searchTracks(
 ): Promise<SpotifyTrack[]> {
   const params = new URLSearchParams({
     q: query,
-    type: "track",
+    type: 'track',
     limit: limit.toString(),
   });
 
@@ -336,7 +312,7 @@ export async function searchTracks(
 export async function getCurrentPlayback(
   userId: string
 ): Promise<{ item?: SpotifyTrack; progress_ms?: number; is_playing?: boolean } | null> {
-  const res = await spotifyFetch(userId, "/me/player/currently-playing");
+  const res = await spotifyFetch(userId, '/me/player/currently-playing');
   if (res.status === 204) return null;
   if (!res.ok) return null;
   return res.json();
@@ -348,13 +324,43 @@ export async function startPlayback(
   userId: string,
   options: { contextUri: string; trackUri: string }
 ): Promise<Response> {
-  return spotifyFetch(userId, "/me/player/play", {
-    method: "PUT",
+  return spotifyFetch(userId, '/me/player/play', {
+    method: 'PUT',
     body: JSON.stringify({
       context_uri: options.contextUri,
       offset: { uri: options.trackUri },
     }),
   });
+}
+
+// ─── User Library ───────────────────────────────────────────────────────────
+
+export async function checkSavedTracks(userId: string, trackIds: string[]): Promise<boolean[]> {
+  const res = await spotifyFetch(userId, `/me/tracks/contains?ids=${trackIds.join(',')}`);
+  if (!res.ok) {
+    throw new Error(`Failed to check saved tracks: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function saveTracks(userId: string, trackIds: string[]): Promise<void> {
+  const res = await spotifyFetch(userId, '/me/tracks', {
+    method: 'PUT',
+    body: JSON.stringify({ ids: trackIds }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save tracks: ${res.status}`);
+  }
+}
+
+export async function removeSavedTracks(userId: string, trackIds: string[]): Promise<void> {
+  const res = await spotifyFetch(userId, '/me/tracks', {
+    method: 'DELETE',
+    body: JSON.stringify({ ids: trackIds }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to remove tracks: ${res.status}`);
+  }
 }
 
 // ─── Playlist Reorder ───────────────────────────────────────────────────────
@@ -365,7 +371,7 @@ export async function reorderPlaylistTracks(
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
   const res = await spotifyFetch(userId, `/playlists/${playlistId}/tracks`, {
-    method: "PUT",
+    method: 'PUT',
     body: JSON.stringify({ uris }),
   });
   if (!res.ok) {

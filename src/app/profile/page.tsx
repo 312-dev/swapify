@@ -1,20 +1,20 @@
-import { requireAuth } from "@/lib/auth";
-import { db } from "@/db";
-import { jamMembers, jamTracks } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import ProfileClient from "./ProfileClient";
+import { requireAuth } from '@/lib/auth';
+import { db } from '@/db';
+import { playlistMembers, playlistTracks } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import ProfileClient from './ProfileClient';
 
 export default async function ProfilePage() {
   const user = await requireAuth();
 
-  // Count user's jams
-  const memberships = await db.query.jamMembers.findMany({
-    where: eq(jamMembers.userId, user.id),
+  // Count user's playlists
+  const memberships = await db.query.playlistMembers.findMany({
+    where: eq(playlistMembers.userId, user.id),
   });
 
   // Count tracks added by user
-  const tracksAdded = await db.query.jamTracks.findMany({
-    where: eq(jamTracks.addedByUserId, user.id),
+  const tracksAdded = await db.query.playlistTracks.findMany({
+    where: eq(playlistTracks.addedByUserId, user.id),
   });
 
   return (

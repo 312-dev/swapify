@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
-import { searchTracks } from "@/lib/spotify";
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { searchTracks } from '@/lib/spotify';
 
 // GET /api/spotify/search?q=...
 export async function GET(request: NextRequest) {
   const user = await requireAuth();
-  const query = request.nextUrl.searchParams.get("q");
+  const query = request.nextUrl.searchParams.get('q');
 
   if (!query || query.trim().length === 0) {
     return NextResponse.json({ tracks: [] });

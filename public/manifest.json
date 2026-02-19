@@ -1,6 +1,6 @@
 {
-  "name": "Deep Digs",
-  "short_name": "Deep Digs",
+  "name": "Swapify",
+  "short_name": "Swapify",
   "description": "Collaborative playlists that clean themselves up",
   "id": "/dashboard",
   "start_url": "/dashboard",

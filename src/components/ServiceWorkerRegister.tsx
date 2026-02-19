@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 export default function ServiceWorkerRegister() {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register("/sw.js")
+        .register('/sw.js')
         .then((reg) => {
-          console.log("[Deep Digs] Service worker registered:", reg.scope);
+          console.log('[Swapify] Service worker registered:', reg.scope);
         })
         .catch((err) => {
-          console.error("[Deep Digs] Service worker registration failed:", err);
+          console.error('[Swapify] Service worker registration failed:', err);
         });
     }
   }, []);

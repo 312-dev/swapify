@@ -43,6 +43,20 @@
       "when": 1771450410754,
       "tag": "0005_violet_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1771455600000,
+      "tag": "0006_rename_jam_to_playlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1771542000000,
+      "tag": "0007_add_removal_delay",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { SessionOptions } from "iron-session";
+import { SessionOptions } from 'iron-session';
 
 export interface SessionData {
   userId?: string;
@@ -11,11 +11,11 @@ export interface SessionData {
 
 export const sessionOptions: SessionOptions = {
   password: process.env.IRON_SESSION_PASSWORD!,
-  cookieName: "deepdigs_session",
+  cookieName: 'swapify_session',
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: 'lax' as const,
     maxAge: 60 * 60 * 24 * 30, // 30 days
   },
 };

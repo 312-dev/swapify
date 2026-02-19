@@ -1,10 +1,10 @@
-import { cookies } from "next/headers";
-import { getIronSession } from "iron-session";
-import { redirect } from "next/navigation";
-import { SessionData, sessionOptions } from "./session";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { cookies } from 'next/headers';
+import { getIronSession } from 'iron-session';
+import { redirect } from 'next/navigation';
+import { SessionData, sessionOptions } from './session';
+import { db } from '@/db';
+import { users } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function getSession() {
   const cookieStore = await cookies();
@@ -25,7 +25,7 @@ export async function getCurrentUser() {
 export async function requireAuth() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
   return user;
 }

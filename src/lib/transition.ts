@@ -1,47 +1,31 @@
-// Tab indices for directional slide on tab switches
-const TAB_ORDER: Record<string, number> = {
-  "/dashboard": 0,
-  "/activity": 1,
-  "/profile": 2,
-};
+// Transition types:
+// - "fade": quick crossfade for lateral tab switches (siblings)
+// - "slide-right": drill deeper (e.g., dashboard → playlist detail)
+// - "slide-left": drill back (e.g., playlist detail → dashboard)
+// - "none": same route, no animation
+
+const TAB_ROUTES = new Set(['/dashboard', '/activity', '/profile']);
 
 function getRouteDepth(pathname: string): number {
-  if (pathname in TAB_ORDER) return 0;
-  if (/^\/jam\/[^/]+$/.test(pathname)) return 1;
-  if (/^\/jam\/[^/]+\//.test(pathname)) return 2;
+  if (TAB_ROUTES.has(pathname)) return 0;
+  if (/^\/playlist\/[^/]+$/.test(pathname)) return 1;
+  if (/^\/playlist\/[^/]+\//.test(pathname)) return 2;
   return 0;
 }
 
-function getTabIndex(pathname: string): number | null {
-  if (pathname.startsWith("/jam/")) return 0; // jam routes belong to dashboard tab
-  return TAB_ORDER[pathname] ?? null;
-}
+export type TransitionType = 'fade' | 'slide-left' | 'slide-right' | 'none';
 
-export type TransitionDirection = "left" | "right" | "none";
-
-export function getTransitionDirection(
-  from: string | null,
-  to: string
-): TransitionDirection {
-  if (!from || from === to) return "none";
+export function getTransitionType(from: string | null, to: string): TransitionType {
+  if (!from || from === to) return 'none';
 
   const fromDepth = getRouteDepth(from);
   const toDepth = getRouteDepth(to);
 
-  // Drill down (e.g., /dashboard -> /jam/[id])
-  if (toDepth > fromDepth) return "right";
-  // Drill up (e.g., /jam/[id] -> /dashboard)
-  if (toDepth < fromDepth) return "left";
+  // Drill down (e.g., /dashboard -> /playlist/[id])
+  if (toDepth > fromDepth) return 'slide-right';
+  // Drill up (e.g., /playlist/[id] -> /dashboard)
+  if (toDepth < fromDepth) return 'slide-left';
 
-  // Same depth: compare tab indices
-  const fromTab = getTabIndex(from);
-  const toTab = getTabIndex(to);
-
-  if (fromTab !== null && toTab !== null) {
-    if (toTab > fromTab) return "right";
-    if (toTab < fromTab) return "left";
-  }
-
-  // Fallback for any other cross-page navigation
-  return "right";
+  // Same depth: lateral tab switch → crossfade
+  return 'fade';
 }

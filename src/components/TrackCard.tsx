@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { formatRelativeTime } from "@/lib/utils";
-import AlbumArt from "@/components/AlbumArt";
+import { useState } from 'react';
+import { formatRelativeTime } from '@/lib/utils';
+import AlbumArt from '@/components/AlbumArt';
 
 interface TrackCardProps {
   track: {
@@ -37,98 +37,77 @@ interface TrackCardProps {
       createdAt: string;
     }>;
   };
-  jamId: string;
+  playlistId: string;
   currentUserId: string;
   spotifyTrackUri: string;
   spotifyPlaylistUri: string;
-  isRemoving?: boolean;
 }
 
-function formatDuration(ms: number): string {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
-}
-
-export default function TrackCard({
-  track,
-  jamId,
-  currentUserId,
-  spotifyTrackUri,
-  spotifyPlaylistUri,
-  isRemoving,
-}: TrackCardProps) {
-  const isComplete =
-    track.listenedCount >= track.totalRequired && track.totalRequired > 0;
-  const [playState, setPlayState] = useState<"idle" | "loading" | "error">(
-    "idle"
-  );
+export default function TrackCard({ track, spotifyTrackUri, spotifyPlaylistUri }: TrackCardProps) {
+  const isComplete = track.listenedCount >= track.totalRequired && track.totalRequired > 0;
+  const [playState, setPlayState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [playError, setPlayError] = useState<string | null>(null);
 
   async function handlePlay() {
-    setPlayState("loading");
+    setPlayState('loading');
     setPlayError(null);
     try {
-      const res = await fetch("/api/spotify/play", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/spotify/play', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trackUri: spotifyTrackUri,
           contextUri: spotifyPlaylistUri,
         }),
       });
       if (res.ok) {
-        setPlayState("idle");
-        globalThis.open(spotifyPlaylistUri, "_self");
+        setPlayState('idle');
+        globalThis.open(spotifyPlaylistUri, '_self');
       } else {
         const data = await res.json();
-        setPlayError(data.error || "Playback failed");
-        setPlayState("error");
+        setPlayError(data.error || 'Playback failed');
+        setPlayState('error');
         setTimeout(() => {
-          setPlayState("idle");
+          setPlayState('idle');
           setPlayError(null);
         }, 3000);
       }
     } catch {
-      setPlayError("Could not reach server");
-      setPlayState("error");
+      setPlayError('Could not reach server');
+      setPlayState('error');
       setTimeout(() => {
-        setPlayState("idle");
+        setPlayState('idle');
         setPlayError(null);
       }, 3000);
     }
   }
 
   const percentage =
-    track.totalRequired > 0
-      ? (track.listenedCount / track.totalRequired) * 100
-      : 0;
+    track.totalRequired > 0 ? (track.listenedCount / track.totalRequired) * 100 : 0;
 
   // Reaction summary - group reactions for inline display
-  const reactionSummary = track.reactions.reduce<Record<string, number>>(
-    (acc, r) => {
-      const emoji =
-        r.reaction === "thumbs_up"
-          ? "\u{1F44D}"
-          : r.reaction === "thumbs_down"
-            ? "\u{1F44E}"
-            : r.reaction;
-      acc[emoji] = (acc[emoji] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
+  const reactionSummary = track.reactions.reduce<Record<string, number>>((acc, r) => {
+    const emoji =
+      r.reaction === 'thumbs_up'
+        ? '\u{1F44D}'
+        : r.reaction === 'thumbs_down'
+          ? '\u{1F44E}'
+          : r.reaction;
+    acc[emoji] = (acc[emoji] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div
-      className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-300 ${isComplete ? "opacity-50" : ""} ${isRemoving ? "scale-95 opacity-0" : ""} hover:bg-white/[0.03]`}
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-300 ${isComplete ? 'opacity-50' : ''} hover:bg-white/[0.03]`}
     >
       {/* Album art with play */}
       <button
         onClick={handlePlay}
-        disabled={playState === "loading"}
+        disabled={playState === 'loading'}
         className="group relative w-12 h-12 rounded-lg shrink-0 overflow-hidden cursor-pointer border-0 p-0 bg-transparent"
         data-tooltip="Play on Spotify"
+        data-play-button
       >
         <AlbumArt
           src={track.albumImageUrl}
@@ -136,14 +115,10 @@ export default function TrackCard({
           className="w-full h-full rounded-none"
         />
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          {playState === "loading" ? (
+          {playState === 'loading' ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <svg
-              className="w-5 h-5 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           )}
@@ -152,53 +127,47 @@ export default function TrackCard({
 
       {/* Track info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate text-text-primary">
-          {track.trackName}
-        </p>
-        <p className="text-xs text-text-secondary truncate">
+        <p className="text-base font-semibold truncate text-text-primary">{track.trackName}</p>
+        <p className="text-sm text-text-secondary truncate">
           {track.artistName}
           <span className="text-text-tertiary">
-            {" "}
+            {' '}
             &middot; {formatRelativeTime(new Date(track.addedAt))}
           </span>
         </p>
-        {playError && (
-          <p className="text-xs text-danger mt-0.5">{playError}</p>
-        )}
+        {playError && <p className="text-sm text-danger mt-0.5">{playError}</p>}
       </div>
 
-      {/* Added by avatar */}
-      <div className="shrink-0" data-tooltip={track.addedBy.displayName}>
-        {track.addedBy.avatarUrl ? (
-          <img
-            src={track.addedBy.avatarUrl}
-            alt={track.addedBy.displayName}
-            className="w-6 h-6 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-semibold text-text-secondary">
-            {track.addedBy.displayName.charAt(0).toUpperCase()}
-          </div>
-        )}
-      </div>
-
-      {/* Right side: reaction summary + progress ring */}
+      {/* Right side: reaction summary + avatar + progress ring */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Inline reaction summary */}
         {Object.keys(reactionSummary).length > 0 && (
-          <div className="flex items-center gap-0.5 text-[11px]">
+          <div className="flex items-center gap-0.5 text-xs">
             {Object.entries(reactionSummary)
               .slice(0, 2)
               .map(([emoji, count]) => (
                 <span key={emoji} className="flex items-center">
                   <span>{emoji}</span>
-                  {count > 1 && (
-                    <span className="text-text-tertiary ml-0.5">{count}</span>
-                  )}
+                  {count > 1 && <span className="text-text-tertiary ml-0.5">{count}</span>}
                 </span>
               ))}
           </div>
         )}
+
+        {/* Added by avatar */}
+        <div data-tooltip={track.addedBy.displayName}>
+          {track.addedBy.avatarUrl ? (
+            <img
+              src={track.addedBy.avatarUrl}
+              alt={track.addedBy.displayName}
+              className="w-6 h-6 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-text-secondary">
+              {track.addedBy.displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
 
         {/* Compact progress ring (SVG) */}
         <div className="relative w-8 h-8 shrink-0">
@@ -222,16 +191,14 @@ export default function TrackCard({
               strokeDasharray={`${2 * Math.PI * 13}`}
               strokeDashoffset={`${2 * Math.PI * 13 * (1 - percentage / 100)}`}
               strokeLinecap="round"
-              className={isComplete ? "text-spotify" : "text-spotify/60"}
-              style={{ transition: "stroke-dashoffset 0.5s ease-out" }}
+              className={isComplete ? 'text-spotify' : 'text-spotify/60'}
+              style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
             />
           </svg>
           <span
-            className={`absolute inset-0 flex items-center justify-center text-[9px] font-semibold ${isComplete ? "text-spotify" : "text-text-tertiary"}`}
+            className={`absolute inset-0 flex items-center justify-center text-[9px] font-semibold ${isComplete ? 'text-spotify' : 'text-text-tertiary'}`}
           >
-            {isComplete
-              ? "\u2713"
-              : `${track.listenedCount}/${track.totalRequired}`}
+            {isComplete ? '\u2713' : `${track.listenedCount}/${track.totalRequired}`}
           </span>
         </div>
       </div>

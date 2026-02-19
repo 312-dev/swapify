@@ -1,39 +1,36 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getIronSession } from "iron-session";
-import { SessionData, sessionOptions } from "@/lib/session";
-import { getSpotifyProfile } from "@/lib/spotify";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { generateId } from "@/lib/utils";
-import type { SpotifyTokenResponse } from "@/types/spotify";
+import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { getIronSession } from 'iron-session';
+import { SessionData, sessionOptions } from '@/lib/session';
+import { getSpotifyProfile } from '@/lib/spotify';
+import { db } from '@/db';
+import { users } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { generateId } from '@/lib/utils';
+import type { SpotifyTokenResponse } from '@/types/spotify';
 
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
-  const error = request.nextUrl.searchParams.get("error");
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.url;
+  const code = request.nextUrl.searchParams.get('code');
+  const error = request.nextUrl.searchParams.get('error');
 
   if (error || !code) {
-    return NextResponse.redirect(
-      new URL(`/login?error=${error || "no_code"}`, request.url)
-    );
+    return NextResponse.redirect(new URL(`/login?error=${error || 'no_code'}`, baseUrl));
   }
 
   const cookieStore = await cookies();
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
 
   if (!session.codeVerifier) {
-    return NextResponse.redirect(
-      new URL("/login?error=no_verifier", request.url)
-    );
+    return NextResponse.redirect(new URL('/login?error=no_verifier', baseUrl));
   }
 
   // Exchange code for tokens
-  const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: "authorization_code",
+      grant_type: 'authorization_code',
       code,
       redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
       client_id: process.env.SPOTIFY_CLIENT_ID!,
@@ -43,10 +40,8 @@ export async function GET(request: NextRequest) {
 
   if (!tokenRes.ok) {
     const err = await tokenRes.text();
-    console.error("Token exchange failed:", err);
-    return NextResponse.redirect(
-      new URL("/login?error=token_exchange", request.url)
-    );
+    console.error('Token exchange failed:', err);
+    return NextResponse.redirect(new URL('/login?error=token_exchange', baseUrl));
   }
 
   const tokenData: SpotifyTokenResponse = await tokenRes.json();
@@ -96,5 +91,5 @@ export async function GET(request: NextRequest) {
   session.returnTo = undefined;
   await session.save();
 
-  return NextResponse.redirect(new URL(returnTo || "/dashboard", request.url));
+  return NextResponse.redirect(new URL(returnTo || '/dashboard', baseUrl));
 }

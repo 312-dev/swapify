@@ -1,0 +1,25 @@
+app = "swapify"
+primary_region = "ord"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  NEXT_PUBLIC_APP_URL = "https://swapify.312.dev"
+  DATABASE_PATH = "/data/swapify.db"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[mounts]
+  source = "swapify_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

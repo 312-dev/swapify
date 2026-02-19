@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-const AUTHENTICATED_PREFIXES = ["/dashboard", "/activity", "/profile", "/jam"];
+const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist'];
 
 function GridIcon({ className }: { className?: string }) {
   return (
@@ -64,24 +64,22 @@ function ProfileIcon({ className }: { className?: string }) {
 }
 
 const tabs = [
-  { label: "Your Digs", href: "/dashboard", icon: GridIcon },
-  { label: "Activity", href: "/activity", icon: ActivityIcon },
-  { label: "Profile", href: "/profile", icon: ProfileIcon },
+  { label: 'Swaplists', href: '/dashboard', icon: GridIcon },
+  { label: 'Activity', href: '/activity', icon: ActivityIcon },
+  { label: 'Profile', href: '/profile', icon: ProfileIcon },
 ] as const;
 
 function getActiveTab(pathname: string): string {
-  if (pathname === "/activity") return "/activity";
-  if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
-  // Everything else on authenticated paths defaults to "Your Digs"
-  return "/dashboard";
+  if (pathname === '/activity') return '/activity';
+  if (pathname === '/profile' || pathname.startsWith('/profile/')) return '/profile';
+  // Everything else on authenticated paths defaults to "Swaplists"
+  return '/dashboard';
 }
 
 export default function BottomNav() {
   const pathname = usePathname();
 
-  const isAuthenticatedPath = AUTHENTICATED_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix)
-  );
+  const isAuthenticatedPath = AUTHENTICATED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
   if (!isAuthenticatedPath) return null;
 
@@ -97,11 +95,11 @@ export default function BottomNav() {
               key={href}
               href={href}
               className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${
-                isActive ? "text-spotify" : "text-text-secondary"
+                isActive ? 'text-spotify' : 'text-text-secondary'
               }`}
             >
               <Icon />
-              <span className="text-[10px] font-medium mt-1">{label}</span>
+              <span className="text-xs font-medium mt-1">{label}</span>
             </Link>
           );
         })}

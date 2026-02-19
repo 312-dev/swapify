@@ -1,17 +1,14 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --spotify-green: #1DB954;
+  /* Swapify design tokens */
+  --spotify-green: #1db954;
   --spotify-green-hover: #1ed760;
   --card-bg: #181818;
   --card-hover: #282828;
-  --border: #333333;
-  --muted: #a0a0a0;
   --danger: #e74c3c;
-
-  /* New design tokens */
   --bg-gradient-start: #1a3a2a;
   --bg-gradient-end: #0a0a0a;
   --glass-bg: rgba(255, 255, 255, 0.05);
@@ -22,17 +19,34 @@
   --text-secondary: #a7a7a7;
   --text-tertiary: #6a6a6a;
   --bottom-nav-height: 5rem;
+
+  /* shadcn semantic tokens — mapped to dark theme */
+  --radius: 0.625rem;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: var(--card-bg);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--spotify-green);
+  --primary-foreground: #000000;
+  --secondary: var(--glass-bg);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-elevated);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--glass-bg-hover);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--danger);
+  --border: var(--glass-border);
+  --input: var(--glass-border);
+  --ring: var(--spotify-green);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Swapify design tokens */
   --color-spotify: var(--spotify-green);
   --color-spotify-hover: var(--spotify-green-hover);
-  --color-card: var(--card-bg);
   --color-card-hover: var(--card-hover);
-  --color-border: var(--border);
-  --color-muted: var(--muted);
   --color-danger: var(--danger);
   --color-glass: var(--glass-bg);
   --color-glass-border: var(--glass-border);
@@ -43,6 +57,35 @@
   --color-text-tertiary: var(--text-tertiary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* shadcn semantic colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Radii */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
 /* Base reset for native feel */
@@ -57,8 +100,6 @@ html {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -82,7 +123,11 @@ body {
 }
 
 .gradient-bg-radial {
-  background: radial-gradient(ellipse at top, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 70%);
+  background: radial-gradient(
+    ellipse at top,
+    var(--bg-gradient-start) 0%,
+    var(--bg-gradient-end) 70%
+  );
 }
 
 /* Safe area padding for PWA */
@@ -141,7 +186,9 @@ body {
 
 /* Progress bar animation */
 @keyframes progress-fill {
-  from { width: 0%; }
+  from {
+    width: 0%;
+  }
 }
 
 .progress-bar-animated {
@@ -150,8 +197,12 @@ body {
 
 /* Waveform pulse animation */
 @keyframes pulse {
-  0% { transform: scaleY(0.3); }
-  100% { transform: scaleY(1); }
+  0% {
+    transform: scaleY(0.3);
+  }
+  100% {
+    transform: scaleY(1);
+  }
 }
 
 .waveform-bar {
@@ -160,8 +211,12 @@ body {
 
 /* Shimmer loading skeleton */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
@@ -273,4 +328,18 @@ body {
 
 .swipe-action-negative {
   background: linear-gradient(270deg, rgba(231, 76, 60, 0.3), rgba(231, 76, 60, 0.6));
+}
+
+/* Unread tracks badge */
+.unread-badge {
+  box-shadow: 0 0 6px rgba(29, 185, 84, 0.4);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

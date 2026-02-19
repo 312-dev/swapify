@@ -1,7 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import AlbumArt from "@/components/AlbumArt";
+import { useState, useEffect, useRef } from 'react';
+import AlbumArt from '@/components/AlbumArt';
+import { toast } from 'sonner';
 
 interface SearchTrack {
   id: string;
@@ -17,12 +18,12 @@ interface SearchTrack {
 }
 
 interface TrackSearchProps {
-  jamId: string;
+  playlistId: string;
   onTrackAdded: () => void;
 }
 
-export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
-  const [query, setQuery] = useState("");
+export default function TrackSearch({ playlistId, onTrackAdded }: TrackSearchProps) {
+  const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchTrack[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [addingUri, setAddingUri] = useState<string | null>(null);
@@ -40,9 +41,7 @@ export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
     setIsSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `/api/spotify/search?q=${encodeURIComponent(query)}`
-        );
+        const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         setResults(data.tracks || []);
         setShowResults(true);
@@ -61,28 +60,25 @@ export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
   // Close dropdown on click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowResults(false);
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
   async function addTrack(track: SearchTrack) {
     setAddingUri(track.uri);
     try {
-      const res = await fetch(`/api/jams/${jamId}/tracks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch(`/api/playlists/${playlistId}/tracks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           spotifyTrackUri: track.uri,
           spotifyTrackId: track.id,
           trackName: track.name,
-          artistName: track.artists.map((a) => a.name).join(", "),
+          artistName: track.artists.map((a) => a.name).join(', '),
           albumName: track.album.name,
           albumImageUrl: track.album.images[0]?.url || null,
           durationMs: track.duration_ms,
@@ -90,16 +86,16 @@ export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
       });
 
       if (res.ok) {
-        setQuery("");
+        setQuery('');
         setResults([]);
         setShowResults(false);
         onTrackAdded();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to add track");
+        toast.error(data.error || 'Failed to add track');
       }
     } catch {
-      alert("Failed to add track");
+      toast.error('Failed to add track');
     } finally {
       setAddingUri(null);
     }
@@ -108,7 +104,7 @@ export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
   function formatDuration(ms: number): string {
     const min = Math.floor(ms / 60000);
     const sec = Math.floor((ms % 60000) / 1000);
-    return `${min}:${sec.toString().padStart(2, "0")}`;
+    return `${min}:${sec.toString().padStart(2, '0')}`;
   }
 
   return (
@@ -133,7 +129,7 @@ export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
           placeholder="Search for a track to add..."
-          className="w-full pl-10 pr-4 py-3 bg-glass border border-glass-border rounded-xl text-sm text-text-primary placeholder:text-text-tertiary backdrop-blur-sm focus:outline-none focus:border-spotify transition-colors"
+          className="w-full pl-10 pr-4 py-3 bg-glass border border-glass-border rounded-xl text-base text-text-primary placeholder:text-text-tertiary backdrop-blur-sm focus:outline-none focus:border-spotify transition-colors"
         />
         {isSearching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -152,16 +148,19 @@ export default function TrackSearch({ jamId, onTrackAdded }: TrackSearchProps) {
               disabled={addingUri === track.uri}
               className="w-full flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl transition-colors text-left disabled:opacity-50"
             >
-              <AlbumArt src={track.album.images[0]?.url} alt={track.album.name} className="w-10 h-10 rounded-lg" />
+              <AlbumArt
+                src={track.album.images[0]?.url}
+                alt={track.album.name}
+                className="w-10 h-10 rounded-lg"
+              />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">{track.name}</p>
-                <p className="text-xs text-text-secondary truncate">
-                  {track.artists.map((a) => a.name).join(", ")} &middot;{" "}
-                  {track.album.name}
+                <p className="text-base font-medium text-text-primary truncate">{track.name}</p>
+                <p className="text-sm text-text-secondary truncate">
+                  {track.artists.map((a) => a.name).join(', ')} &middot; {track.album.name}
                 </p>
               </div>
-              <span className="text-xs text-text-tertiary shrink-0">
-                {addingUri === track.uri ? "Adding..." : formatDuration(track.duration_ms)}
+              <span className="text-sm text-text-tertiary shrink-0">
+                {addingUri === track.uri ? 'Adding...' : formatDuration(track.duration_ms)}
               </span>
             </button>
           ))}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate PWA icons for Deep Digs.
+ * Generate PWA icons for Swapify.
  * Creates simple branded icons using raw PNG construction with Node.js built-ins.
  * No external dependencies needed.
  */
@@ -8,7 +8,7 @@ import { writeFileSync, mkdirSync } from "fs";
 import { deflateSync } from "zlib";
 
 function createPNG(size) {
-  // Deep Digs brand colors
+  // Swapify brand colors
   const bgR = 10, bgG = 10, bgB = 10;       // #0a0a0a background
   const fgR = 29, fgG = 185, fgB = 84;      // #1DB954 Spotify green
 

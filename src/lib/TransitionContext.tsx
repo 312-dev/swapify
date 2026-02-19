@@ -1,35 +1,24 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useRef, useMemo } from "react";
-import { usePathname } from "next/navigation";
-import {
-  getTransitionDirection,
-  type TransitionDirection,
-} from "./transition";
+import { createContext, useContext, useRef, useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { getTransitionType, type TransitionType } from './transition';
 
-const TransitionContext = createContext<TransitionDirection>("none");
+const TransitionContext = createContext<TransitionType>('none');
 
-export function useTransitionDirection() {
+export function useTransitionType() {
   return useContext(TransitionContext);
 }
 
-export function TransitionDirectionProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function TransitionDirectionProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const prevPathRef = useRef<string | null>(null);
+  const [type, setType] = useState<TransitionType>('none');
 
-  const direction = useMemo(() => {
-    const dir = getTransitionDirection(prevPathRef.current, pathname);
+  useEffect(() => {
+    setType(getTransitionType(prevPathRef.current, pathname));
     prevPathRef.current = pathname;
-    return dir;
   }, [pathname]);
 
-  return (
-    <TransitionContext.Provider value={direction}>
-      {children}
-    </TransitionContext.Provider>
-  );
+  return <TransitionContext.Provider value={type}>{children}</TransitionContext.Provider>;
 }

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
-import { db } from "@/db";
-import { pushSubscriptions } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { generateId } from "@/lib/utils";
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { db } from '@/db';
+import { pushSubscriptions } from '@/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { generateId } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   const user = await requireAuth();
@@ -11,18 +11,12 @@ export async function POST(request: NextRequest) {
   const { endpoint, keys } = body;
 
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
-    return NextResponse.json(
-      { error: "Invalid subscription" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
   }
 
   // Upsert: check if this endpoint already exists for this user
   const existing = await db.query.pushSubscriptions.findFirst({
-    where: and(
-      eq(pushSubscriptions.userId, user.id),
-      eq(pushSubscriptions.endpoint, endpoint)
-    ),
+    where: and(eq(pushSubscriptions.userId, user.id), eq(pushSubscriptions.endpoint, endpoint)),
   });
 
   if (existing) {

@@ -1,0 +1,17 @@
+echo "Running pre-push checks..."
+
+echo "Type checking..."
+npm run type-check
+if [ $? -ne 0 ]; then
+  echo "Type check failed. Fix type errors before pushing."
+  exit 1
+fi
+
+echo "Building..."
+npm run build
+if [ $? -ne 0 ]; then
+  echo "Build failed. Fix build errors before pushing."
+  exit 1
+fi
+
+echo "Pre-push checks passed!"

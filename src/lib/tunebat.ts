@@ -1,13 +1,13 @@
-const TUNEBAT_API = "https://api.tunebat.com/api/tracks/search";
+const TUNEBAT_API = 'https://api.tunebat.com/api/tracks/search';
 
 export interface TunebatTrack {
-  id: string;       // Spotify track ID
-  n: string;        // Track name
-  as: string[];     // Artists
-  b: number;        // BPM
-  da: number;       // Danceability (0-1)
-  e: number;        // Energy (0-1)
-  h: number;        // Happiness/Valence (0-1)
+  id: string; // Spotify track ID
+  n: string; // Track name
+  as: string[]; // Artists
+  b: number; // BPM
+  da: number; // Danceability (0-1)
+  e: number; // Energy (0-1)
+  h: number; // Happiness/Valence (0-1)
 }
 
 export interface TrackVibeScore {
@@ -28,7 +28,7 @@ async function searchTunebat(query: string): Promise<TunebatTrack[]> {
   const res = await fetch(url);
 
   if (!res.ok) {
-    const retryAfter = res.headers.get("retry-after");
+    const retryAfter = res.headers.get('retry-after');
     if (retryAfter) {
       const waitSec = parseInt(retryAfter, 10) + 1;
       await new Promise((r) => setTimeout(r, waitSec * 1000));
@@ -39,7 +39,10 @@ async function searchTunebat(query: string): Promise<TunebatTrack[]> {
 
   const text = await res.text();
   const data = JSON.parse(
-    text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/'/g, "'")
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/'/g, "'")
   );
   return data.data?.items ?? [];
 }
@@ -50,12 +53,7 @@ async function searchTunebat(query: string): Promise<TunebatTrack[]> {
  */
 function computeVibeScore(track: TunebatTrack): number {
   const normalizedTempo = Math.max(0, Math.min(1, (track.b - 60) / 140));
-  return (
-    0.4 * track.e +
-    0.25 * track.h +
-    0.25 * track.da +
-    0.1 * normalizedTempo
-  );
+  return 0.4 * track.e + 0.25 * track.h + 0.25 * track.da + 0.1 * normalizedTempo;
 }
 
 /**
