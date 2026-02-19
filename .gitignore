@@ -42,3 +42,6 @@ next-env.d.ts
 
 # design inspiration
 /inspo/
+
+# local database
+/data/
