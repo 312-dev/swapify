@@ -67,6 +67,23 @@ export async function notifyPlaylistMembers(
   );
 }
 
+export async function notifyCircleMembers(
+  circleId: string,
+  excludeUserId: string,
+  payload: NotificationPayload,
+  type?: NotificationType
+): Promise<void> {
+  const { circleMembers } = await import('@/db/schema');
+
+  const members = await db.query.circleMembers.findMany({
+    where: eq(circleMembers.circleId, circleId),
+  });
+
+  await Promise.allSettled(
+    members.filter((m) => m.userId !== excludeUserId).map((m) => notify(m.userId, payload, type))
+  );
+}
+
 async function sendPushNotification(userId: string, payload: NotificationPayload): Promise<void> {
   const subs = await db.query.pushSubscriptions.findMany({
     where: eq(pushSubscriptions.userId, userId),

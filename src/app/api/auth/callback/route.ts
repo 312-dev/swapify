@@ -189,6 +189,25 @@ async function handleJoinCircle(
       refreshToken: tokens.refreshToken ?? encrypt(rawRefreshToken!),
       tokenExpiresAt: tokens.tokenExpiresAt,
     });
+
+    // Notify existing circle members (fire-and-forget)
+    const newMember = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    if (newMember) {
+      import('@/lib/notifications').then(({ notifyCircleMembers }) => {
+        notifyCircleMembers(
+          pendingCircleId,
+          userId,
+          {
+            title: 'New Circle member',
+            body: `${newMember.displayName} joined your Circle`,
+            url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
+          },
+          'circleJoined'
+        );
+      });
+    }
   }
 
   return { circleId: circle.id, circleName: circle.name };

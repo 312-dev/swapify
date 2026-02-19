@@ -101,6 +101,25 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
   );
   const [pushMaster, setPushMaster] = useState(user.notifyPush);
   const [emailMaster, setEmailMaster] = useState(user.notifyEmail);
+  const [browserPushState, setBrowserPushState] = useState<
+    'granted' | 'denied' | 'default' | 'unsupported' | null
+  >(null);
+
+  // Detect browser notification permission and sync push toggle
+  useEffect(() => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setBrowserPushState('unsupported');
+      if (pushMaster) setPushMaster(false);
+      return;
+    }
+    const perm = Notification.permission;
+    setBrowserPushState(perm);
+    // If DB says push is on but browser hasn't granted permission, show as off
+    if (perm !== 'granted' && pushMaster) {
+      setPushMaster(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const emailVerified = searchParams.get('emailVerified');
@@ -197,6 +216,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
 
       if (Notification.permission === 'default') {
         const result = await Notification.requestPermission();
+        setBrowserPushState(result);
         if (result !== 'granted') {
           toast.error('Notification permission denied');
           return false;
@@ -288,12 +308,25 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
             Notification Channels
           </h3>
           <div className="space-y-4">
-            <ToggleRow
-              label="Push notifications"
-              description="Browser & mobile push alerts"
-              enabled={pushMaster}
-              onChange={handlePushMasterToggle}
-            />
+            <div>
+              <ToggleRow
+                label="Push notifications"
+                description="Browser & mobile push alerts"
+                enabled={pushMaster}
+                onChange={handlePushMasterToggle}
+              />
+              {browserPushState === 'denied' && (
+                <p className="text-xs text-amber-400 mt-1.5 ml-0.5">
+                  Notifications are blocked in your browser. Enable them in your browser/OS settings
+                  to use push.
+                </p>
+              )}
+              {browserPushState === 'unsupported' && (
+                <p className="text-xs text-text-tertiary mt-1.5 ml-0.5">
+                  Push notifications are not supported in this browser.
+                </p>
+              )}
+            </div>
 
             <div>
               <ToggleRow

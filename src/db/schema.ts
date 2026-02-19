@@ -1,4 +1,12 @@
-import { pgTable, text, integer, uniqueIndex, boolean, timestamp } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  integer,
+  bigint,
+  uniqueIndex,
+  boolean,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -11,8 +19,8 @@ export const users = pgTable('users', {
   email: text('email'),
   pendingEmail: text('pending_email'),
   emailVerifyToken: text('email_verify_token'),
-  emailVerifyExpiresAt: integer('email_verify_expires_at'),
-  notifyPush: boolean('notify_push').notNull().default(true),
+  emailVerifyExpiresAt: bigint('email_verify_expires_at', { mode: 'number' }),
+  notifyPush: boolean('notify_push').notNull().default(false),
   notifyEmail: boolean('notify_email').notNull().default(false),
   notificationPrefs: text('notification_prefs'), // JSON: per-type channel prefs
   autoNegativeReactions: boolean('auto_negative_reactions').notNull().default(true),

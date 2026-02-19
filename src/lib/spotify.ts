@@ -280,6 +280,24 @@ export async function followPlaylist(
   }
 }
 
+export async function checkFollowPlaylist(
+  userId: string,
+  circleId: string,
+  spotifyPlaylistId: string,
+  spotifyUserId: string
+): Promise<boolean> {
+  const res = await spotifyFetch(
+    userId,
+    circleId,
+    `/playlists/${spotifyPlaylistId}/followers/contains?ids=${spotifyUserId}`
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to check playlist follow: ${res.status}`);
+  }
+  const data: boolean[] = await res.json();
+  return data[0] ?? false;
+}
+
 export async function getPlaylistDetails(
   userId: string,
   circleId: string,

@@ -4,7 +4,13 @@
  * When null/missing, DEFAULT_NOTIFICATION_PREFS is used.
  */
 
-export type NotificationType = 'newTrack' | 'memberJoined' | 'reactions' | 'trackRemoved';
+export type NotificationType =
+  | 'newTrack'
+  | 'memberJoined'
+  | 'reactions'
+  | 'trackRemoved'
+  | 'circleJoined'
+  | 'playlistFollowed';
 
 export interface ChannelPrefs {
   push: boolean;
@@ -21,6 +27,11 @@ export const NOTIFICATION_TYPE_LABELS: Record<
   memberJoined: { label: 'New members', description: 'When someone joins a Swaplist' },
   reactions: { label: 'Reactions', description: 'When someone reacts to your track' },
   trackRemoved: { label: 'Track removed', description: 'When your track is removed' },
+  circleJoined: { label: 'Circle joins', description: 'When someone joins your Circle' },
+  playlistFollowed: {
+    label: 'Playlist follows',
+    description: 'When someone follows a Swaplist on Spotify',
+  },
 };
 
 export const NOTIFICATION_TYPES = Object.keys(NOTIFICATION_TYPE_LABELS) as NotificationType[];
@@ -30,6 +41,8 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   memberJoined: { push: true, email: true },
   reactions: { push: true, email: false },
   trackRemoved: { push: false, email: true },
+  circleJoined: { push: true, email: true },
+  playlistFollowed: { push: false, email: false },
 };
 
 /** Parse stored JSON prefs, merging with defaults for any missing keys */
