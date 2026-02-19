@@ -49,3 +49,9 @@ next-env.d.ts
 
 # local database
 /data/
+
+# color palette previews
+/color-previews/
+
+# hero background videos (too large for git)
+/public/videos/
