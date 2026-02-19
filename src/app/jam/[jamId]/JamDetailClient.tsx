@@ -6,6 +6,7 @@ import TrackCard from "@/components/TrackCard";
 import TrackSearch from "@/components/TrackSearch";
 import SwipeableTrackCard from "@/components/SwipeableTrackCard";
 import AlbumArt from "@/components/AlbumArt";
+import ShareSheet from "@/components/ShareSheet";
 
 interface JamDetailClientProps {
   jamId: string;
@@ -84,7 +85,7 @@ export default function JamDetailClient({
     Array<{ id: string; displayName: string; avatarUrl: string | null }>
   >([]);
   const [showPrevious, setShowPrevious] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [sorting, setSorting] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -144,13 +145,6 @@ export default function JamDetailClient({
     } finally {
       setSorting(false);
     }
-  }
-
-  function copyInviteLink() {
-    const url = `${window.location.origin}/jam/join?code=${inviteCode}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleReaction(spotifyTrackId: string, reaction: string) {
@@ -360,10 +354,10 @@ export default function JamDetailClient({
               </button>
             )}
             <button
-              onClick={copyInviteLink}
+              onClick={() => setShowShare(true)}
               className="btn-pill-secondary text-xs! py-2! px-4!"
             >
-              {copied ? "Copied!" : "Share"}
+              Share
             </button>
             {isOwner && (
               <a
@@ -499,6 +493,14 @@ export default function JamDetailClient({
           </AnimatePresence>
         </div>
       )}
+      {/* Share sheet */}
+      <ShareSheet
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        inviteCode={inviteCode}
+        jamId={jamId}
+        jamName={jamName}
+      />
     </main>
   );
 }
