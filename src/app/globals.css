@@ -1,26 +1,276 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --spotify-green: #1DB954;
+  --spotify-green-hover: #1ed760;
+  --card-bg: #181818;
+  --card-hover: #282828;
+  --border: #333333;
+  --muted: #a0a0a0;
+  --danger: #e74c3c;
+
+  /* New design tokens */
+  --bg-gradient-start: #1a3a2a;
+  --bg-gradient-end: #0a0a0a;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --surface-elevated: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #a7a7a7;
+  --text-tertiary: #6a6a6a;
+  --bottom-nav-height: 5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-spotify: var(--spotify-green);
+  --color-spotify-hover: var(--spotify-green-hover);
+  --color-card: var(--card-bg);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --color-glass: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-glass-hover: var(--glass-bg-hover);
+  --color-surface: var(--surface-elevated);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Base reset for native feel */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html {
+  scroll-behavior: smooth;
+  overscroll-behavior: none;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.glass-hover:hover {
+  background: var(--glass-bg-hover);
+}
+
+/* Gradient backgrounds */
+.gradient-bg {
+  background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 60%);
+}
+
+.gradient-bg-radial {
+  background: radial-gradient(ellipse at top, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 70%);
+}
+
+/* Safe area padding for PWA */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height));
+}
+
+.safe-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Hide scrollbar for carousels */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Portal tooltip (rendered by TooltipProvider) */
+.tooltip-portal {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  border: 1px solid var(--glass-border);
+  transition: opacity 0.12s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Overlapping avatar stack */
+.avatar-stack {
+  display: flex;
+  flex-direction: row;
+}
+
+.avatar-stack > * {
+  margin-left: -8px;
+  border: 2px solid var(--background);
+  border-radius: 9999px;
+}
+
+.avatar-stack > *:first-child {
+  margin-left: 0;
+}
+
+/* Progress bar animation */
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+
+.progress-bar-animated {
+  animation: progress-fill 0.5s ease-out;
+}
+
+/* Waveform pulse animation */
+@keyframes pulse {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
+}
+
+.waveform-bar {
+  animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+/* Shimmer loading skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--card-bg) 25%, var(--card-hover) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Drop zone styles */
+.drop-zone-active {
+  border-color: var(--spotify-green) !important;
+  background: rgba(29, 185, 84, 0.1) !important;
+}
+
+/* Scrollbar styling (desktop) */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
+}
+
+/* Input styling for glassmorphism */
+.input-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  font-size: 16px; /* Prevents iOS zoom */
+  transition: border-color 0.2s;
+}
+
+.input-glass::placeholder {
+  color: var(--text-tertiary);
+}
+
+.input-glass:focus {
+  outline: none;
+  border-color: var(--spotify-green);
+}
+
+/* Pill button base */
+.btn-pill,
+.btn-pill-primary,
+.btn-pill-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-pill-primary {
+  background: var(--spotify-green);
+  color: #000;
+}
+
+.btn-pill-primary:hover {
+  background: var(--spotify-green-hover);
+  transform: scale(1.02);
+}
+
+.btn-pill-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-pill-secondary {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.btn-pill-secondary:hover {
+  background: var(--glass-bg-hover);
+}
+
+.btn-pill-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Swipe action backgrounds */
+.swipe-action-positive {
+  background: linear-gradient(90deg, rgba(29, 185, 84, 0.3), rgba(29, 185, 84, 0.6));
+}
+
+.swipe-action-negative {
+  background: linear-gradient(270deg, rgba(231, 76, 60, 0.3), rgba(231, 76, 60, 0.6));
 }
