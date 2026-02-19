@@ -1,0 +1,6 @@
+name: "Swapify CodeQL config"
+
+paths-ignore:
+  - "scripts/**"
+  - "drizzle/**"
+  - "public/sw.js"
