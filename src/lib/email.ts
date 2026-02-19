@@ -19,7 +19,7 @@ export async function sendEmail(
 
   try {
     await resend.emails.send({
-      from: 'Swapify <notifications@swapify.app>',
+      from: 'Swapify <swapify@312.dev>',
       to,
       subject: `Swapify: ${subject}`,
       html: emailTemplate(subject, body, url, unsubUrl),
@@ -34,6 +34,7 @@ export async function sendEmail(
     });
   } catch (error) {
     console.error('[Swapify] Email send failed:', error);
+    throw error;
   }
 }
 

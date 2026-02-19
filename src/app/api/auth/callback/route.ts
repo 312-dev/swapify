@@ -305,7 +305,11 @@ export async function GET(request: NextRequest) {
 
   // Get user profile from Spotify
   const profile = await getSpotifyProfile(tokenData.access_token);
-  const avatarUrl = profile.images?.at(-1)?.url ?? null;
+  // Pick the largest available profile image (Spotify doesn't guarantee sort order)
+  const avatarUrl =
+    profile.images?.sort(
+      (a: { width?: number }, b: { width?: number }) => (b.width ?? 0) - (a.width ?? 0)
+    )[0]?.url ?? null;
 
   // Upsert user profile (no tokens — those live in circle_members)
   const { userId, isNewUser } = await upsertUserProfile(

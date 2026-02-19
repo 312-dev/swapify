@@ -26,14 +26,18 @@ export async function POST(request: Request) {
     })
     .where(eq(users.id, user.id));
 
-  const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/profile/email/verify?token=${token}`;
+  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/profile/email/verify?token=${token}`;
 
-  await sendEmail(
-    email,
-    'Confirm your email',
-    'Click the link below to confirm your email address for Swapify.',
-    verifyUrl
-  );
+  try {
+    await sendEmail(
+      email,
+      'Confirm your email',
+      'Click the link below to confirm your email address for Swapify.',
+      verifyUrl
+    );
+  } catch {
+    return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }
