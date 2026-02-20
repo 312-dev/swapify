@@ -160,6 +160,14 @@ body {
   z-index: 1;
 }
 
+/* On desktop the top nav creates a padding gap — extend gradient upward to fill it */
+@media (min-width: 640px) {
+  .gradient-bg::before,
+  .gradient-bg-radial::before {
+    top: -5rem;
+  }
+}
+
 /* Subtle film grain overlay — adds tactile analog depth */
 .grain-overlay::before {
   content: '';

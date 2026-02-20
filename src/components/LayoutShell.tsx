@@ -19,7 +19,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
     <LazyMotion features={domAnimation}>
       <TransitionDirectionProvider>
         <UnreadActivityProvider>
-          <div className={`overflow-x-hidden ${showBottomNav ? 'pb-20 sm:pb-0 sm:pt-20' : ''}`}>
+          <div className={`overflow-x-clip ${showBottomNav ? 'pb-20 sm:pb-0 sm:pt-20' : ''}`}>
             {showBottomNav ? (
               <div className="max-w-2xl mx-auto w-full">
                 <PageTransition>{children}</PageTransition>
