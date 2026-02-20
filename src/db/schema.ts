@@ -109,6 +109,7 @@ export const playlistMembers = pgTable(
       .references(() => users.id),
     likedPlaylistId: text('liked_playlist_id'),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    lastActivitySeenAt: timestamp('last_activity_seen_at', { withTimezone: true }),
   },
   (table) => [uniqueIndex('playlist_members_playlist_user_idx').on(table.playlistId, table.userId)]
 );
