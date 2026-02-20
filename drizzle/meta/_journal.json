@@ -78,6 +78,13 @@
       "when": 1772200000000,
       "tag": "0016_add_circle_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772300000000,
+      "tag": "0017_add_last_activity_seen",
+      "breakpoints": true
     }
   ]
 }
