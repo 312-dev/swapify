@@ -27,6 +27,20 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      - name: Unit tests
+        run: npm test
+        env:
+          IRON_SESSION_PASSWORD: test-password-that-is-at-least-32-characters-long
+          POLL_SECRET: test-poll-secret-16chars
+          NEXT_PUBLIC_APP_URL: https://test.swapify.app
+
+      - name: Integration tests
+        run: npm run test:integration
+        env:
+          IRON_SESSION_PASSWORD: test-password-that-is-at-least-32-characters-long
+          POLL_SECRET: test-poll-secret-16chars
+          NEXT_PUBLIC_APP_URL: https://test.swapify.app
+
       - name: Build
         run: npm run build
         env:

@@ -29,6 +29,30 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      - name: Unit tests
+        run: npm test
+        env:
+          IRON_SESSION_PASSWORD: test-password-that-is-at-least-32-characters-long
+          POLL_SECRET: test-poll-secret-16chars
+          NEXT_PUBLIC_APP_URL: https://test.swapify.app
+
+      - name: Integration tests
+        run: npm run test:integration
+        env:
+          IRON_SESSION_PASSWORD: test-password-that-is-at-least-32-characters-long
+          POLL_SECRET: test-poll-secret-16chars
+          NEXT_PUBLIC_APP_URL: https://test.swapify.app
+
+      - name: Check for schema drift
+        run: |
+          SCHEMA_CHANGED=$(git diff origin/main...HEAD --name-only -- src/db/schema.ts | wc -l)
+          MIGRATION_ADDED=$(git diff origin/main...HEAD --name-only -- 'drizzle/*.sql' | wc -l)
+          if [ "$SCHEMA_CHANGED" -gt 0 ] && [ "$MIGRATION_ADDED" -eq 0 ]; then
+            echo "::error::Schema changed (src/db/schema.ts) but no migration file added in drizzle/*.sql"
+            echo "Run 'npm run db:generate' or write a manual migration, then commit the SQL file."
+            exit 1
+          fi
+
       - name: Build
         run: npm run build
         env:

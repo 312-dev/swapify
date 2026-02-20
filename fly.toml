@@ -9,6 +9,9 @@ primary_region = "ord"
   # DATABASE_URL set via `fly secrets set DATABASE_URL=...`
   # ANTHROPIC_API_KEY set via `fly secrets set ANTHROPIC_API_KEY=...`
 
+[deploy]
+  release_command = "node src/db/migrate.mjs"
+
 [http_service]
   internal_port = 3000
   force_https = true

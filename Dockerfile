@@ -24,10 +24,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy migration files + migrate script (for release_command)
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/src/db/migrate.mjs ./src/db/migrate.mjs
+COPY --from=deps /app/node_modules ./node_modules
+
 # Copy public assets
 COPY --from=builder /app/public ./public
 
-# Copy standalone output
+# Copy standalone output (overwrites node_modules with traced subset for app)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
