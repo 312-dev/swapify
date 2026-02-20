@@ -204,6 +204,8 @@ export default function VerifyEmailClient({
                 className="input-glass w-full"
                 required
                 autoFocus
+                autoComplete="email"
+                enterKeyHint="send"
               />
 
               {error && <p className="text-sm text-danger text-center">{error}</p>}

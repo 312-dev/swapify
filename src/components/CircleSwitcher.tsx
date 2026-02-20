@@ -188,8 +188,9 @@ export default function CircleSwitcher({
         }}
         title="Your Circles"
         snapPoint="half"
+        direction="top"
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 py-1">
           {circles.map((circle, index) => {
             const isActive = circle.id === activeCircleId;
             const isLoading = isSwitching === circle.id;
@@ -394,6 +395,11 @@ export default function CircleSwitcher({
                               }}
                               placeholder="Enter invite code"
                               className="input-glass flex-1"
+                              enterKeyHint="go"
+                              autoComplete="off"
+                              autoCapitalize="off"
+                              autoCorrect="off"
+                              spellCheck={false}
                             />
                             <button
                               onClick={() => lookupCircleCode(joinCode.trim())}

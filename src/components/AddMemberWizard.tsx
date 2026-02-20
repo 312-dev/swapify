@@ -11,6 +11,7 @@ import {
   ExternalLink,
   AlertCircle,
   Link2,
+  Share2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import GlassDrawer from '@/components/ui/glass-drawer';
@@ -70,6 +71,20 @@ export default function AddMemberWizard({
       toast.success('Share link copied');
       setTimeout(() => setLinkCopied(false), 2000);
     });
+  }
+
+  async function handleNativeShare() {
+    const link = `${window.location.origin}/circle/join?code=${inviteCode}`;
+    try {
+      await navigator.share({
+        title: 'Join my circle on Swapify',
+        text: `Use code: ${inviteCode}`,
+        url: link,
+      });
+    } catch {
+      // User cancelled or share API unavailable — fall back to copy
+      handleCopyShareLink();
+    }
   }
 
   async function handleSendEmail() {
@@ -224,47 +239,53 @@ export default function AddMemberWizard({
                   Send this code to your friend so they can join your circle in Swapify.
                 </p>
 
-                {/* Invite code display */}
-                <div className="glass rounded-xl p-5 text-center">
+                {/* Invite code display — tap to copy */}
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="glass rounded-xl px-5 py-4 w-full flex items-center justify-between gap-3 group active:scale-[0.98] transition-transform"
+                >
                   <code className="text-2xl font-mono font-bold text-text-primary tracking-[0.2em] select-all">
                     {inviteCode}
                   </code>
+                  <span className="shrink-0 text-text-secondary group-hover:text-text-primary transition-colors">
+                    {copied ? (
+                      <Check className="w-5 h-5 text-accent-green" />
+                    ) : (
+                      <Copy className="w-5 h-5" />
+                    )}
+                  </span>
+                </button>
+
+                {/* Share actions */}
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={handleCopy}
-                    className="mt-3 mx-auto btn-pill btn-pill-secondary flex items-center gap-2 text-sm"
+                    onClick={handleCopyShareLink}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors"
                   >
-                    {copied ? (
+                    {linkCopied ? (
                       <>
-                        <Check className="w-4 h-4 text-green-400" />
-                        Copied!
+                        <Check className="w-3.5 h-3.5 text-accent-green" />
+                        <span className="text-accent-green">Copied!</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-4 h-4" />
-                        Copy Code
+                        <Link2 className="w-3.5 h-3.5" />
+                        Copy Link
                       </>
                     )}
                   </button>
-                  <div className="mt-3 pt-3 border-t border-white/5">
+                  {typeof navigator !== 'undefined' && 'share' in navigator && (
                     <button
                       type="button"
-                      onClick={handleCopyShareLink}
-                      className="mx-auto btn-pill btn-pill-secondary flex items-center gap-2 text-sm"
+                      onClick={handleNativeShare}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors"
                     >
-                      {linkCopied ? (
-                        <>
-                          <Check className="w-4 h-4 text-green-400" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Link2 className="w-4 h-4" />
-                          Copy Share Link
-                        </>
-                      )}
+                      <Share2 className="w-3.5 h-3.5" />
+                      Share
                     </button>
-                  </div>
+                  )}
                 </div>
 
                 {/* Or send by email */}
@@ -279,6 +300,8 @@ export default function AddMemberWizard({
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="friend@example.com"
                       className="input-glass flex-1"
+                      autoComplete="email"
+                      enterKeyHint="send"
                     />
                     <button
                       type="button"

@@ -131,12 +131,14 @@ export default function PlaylistSettingsPage() {
             <input
               id="maxTracksPerUser"
               type="number"
+              inputMode="numeric"
               min="1"
               max="50"
               value={maxTracksPerUser}
               onChange={(e) => setMaxTracksPerUser(e.target.value)}
               placeholder="Unlimited"
               className="input-glass w-full"
+              enterKeyHint="done"
             />
             <p className="text-sm text-text-tertiary mt-1.5">
               Limit how many active tracks each member can have. Leave blank for unlimited.
@@ -197,11 +199,13 @@ export default function PlaylistSettingsPage() {
             <input
               id="maxTrackAgeDays"
               type="number"
+              inputMode="numeric"
               min={0}
               max={365}
               value={maxTrackAgeDays}
               onChange={(e) => setMaxTrackAgeDays(Number(e.target.value))}
               className="input-glass w-full"
+              enterKeyHint="done"
             />
             {maxTrackAgeDays > 0 && (
               <p className="text-sm text-text-tertiary mt-2">

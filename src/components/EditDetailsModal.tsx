@@ -155,6 +155,8 @@ export default function EditDetailsModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Name"
               className="input-glass w-full"
+              autoComplete="off"
+              enterKeyHint="next"
             />
             <textarea
               value={description}

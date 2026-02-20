@@ -853,6 +853,11 @@ export default function LandingClient() {
                   placeholder="Enter invite code"
                   className="input-glass flex-1 text-sm"
                   maxLength={10}
+                  enterKeyHint="go"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
                 <button
                   onClick={handleJoinSubmit}
@@ -906,6 +911,8 @@ export default function LandingClient() {
               placeholder="Spotify username or email"
               className="input-glass w-full"
               onKeyDown={(e) => e.key === 'Enter' && handleSignInLookup()}
+              autoComplete="username"
+              enterKeyHint="go"
             />
             <button
               onClick={handleSignInLookup}

@@ -436,6 +436,8 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                       onChange={(e) => setEmailInput(e.target.value)}
                       required
                       autoFocus
+                      autoComplete="email"
+                      enterKeyHint="send"
                     />
                     <button
                       type="submit"

@@ -176,6 +176,11 @@ function JoinCircleContent() {
                   }}
                   placeholder="Enter invite code"
                   className="input-glass flex-1"
+                  enterKeyHint="go"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
                 <button
                   onClick={() => lookupCode(code.trim())}

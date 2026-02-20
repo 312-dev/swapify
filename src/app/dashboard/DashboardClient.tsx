@@ -99,50 +99,49 @@ const VIBE_PLACEHOLDERS: Array<{
   name: string;
   desc: string;
   vibeLine: string;
-  emoji: string;
-  gradient: [string, string];
+  imageUrl: string;
 }> = [
   {
     name: 'late night drives',
     desc: 'windows down, vibes up',
     vibeLine: 'moody R&B \u00b7 chill rap \u00b7 slow jams',
-    emoji: '\ud83c\udf19',
-    gradient: ['#1e1b4b', '#312e81'],
+    imageUrl:
+      'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=112&h=112&fit=crop&auto=format',
   },
   {
     name: 'UNHINGED BANGERS',
     desc: 'no skips, only chaos',
     vibeLine: 'hyperpop \u00b7 hard drops \u00b7 EDM',
-    emoji: '\ud83d\udd25',
-    gradient: ['#7f1d1d', '#dc2626'],
+    imageUrl:
+      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=112&h=112&fit=crop&auto=format',
   },
   {
     name: 'main character energy',
     desc: 'the soundtrack to your villain arc',
     vibeLine: 'indie pop \u00b7 alt \u00b7 cinematic',
-    emoji: '\u2728',
-    gradient: ['#0c4a6e', '#38bdf8'],
+    imageUrl:
+      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=112&h=112&fit=crop&auto=format',
   },
   {
     name: 'COZY GIRL AUTUMN',
     desc: 'candles lit, oversized hoodie on',
     vibeLine: 'soft folk \u00b7 acoustic \u00b7 bedroom pop',
-    emoji: '\ud83c\udf42',
-    gradient: ['#78350f', '#d97706'],
+    imageUrl:
+      'https://images.unsplash.com/photo-1508193638397-1c4234db14d8?w=112&h=112&fit=crop&auto=format',
   },
   {
     name: 'gym arc',
     desc: 'PR or ER, no in between',
     vibeLine: 'trap \u00b7 drill \u00b7 rage beats',
-    emoji: '\ud83d\udcaa',
-    gradient: ['#14532d', '#22c55e'],
+    imageUrl:
+      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=112&h=112&fit=crop&auto=format',
   },
   {
     name: 'TOUCH GRASS',
     desc: 'for when the group chat goes outside',
     vibeLine: 'feel-good \u00b7 summer hits \u00b7 throwbacks',
-    emoji: '\ud83c\udf3b',
-    gradient: ['#164e63', '#38bdf8'],
+    imageUrl:
+      'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=112&h=112&fit=crop&auto=format',
   },
 ];
 
@@ -424,21 +423,16 @@ export default function DashboardClient({
         <div className="px-4 pt-2 pb-6">
           <div className="relative overflow-hidden">
             {/* Decorative placeholder cards */}
-            <div className="space-y-2 opacity-40 saturate-0 pointer-events-none">
-              {VIBE_PLACEHOLDERS.slice(0, 3).map((vibe, i) => (
+            <div className="space-y-2 opacity-40 pointer-events-none">
+              {VIBE_PLACEHOLDERS.slice(0, 5).map((vibe, i) => (
                 <div
                   key={vibe.name}
                   className="glass rounded-2xl p-3.5 w-full text-left"
-                  style={i >= 1 ? { filter: `blur(${i * 1.5}px)` } : undefined}
+                  style={i >= 2 ? { filter: `blur(${(i - 1) * 1.5}px)` } : undefined}
                 >
                   <div className="flex items-center gap-3.5">
-                    <div
-                      className="w-14 h-14 shrink-0 rounded-lg overflow-hidden flex items-center justify-center text-2xl"
-                      style={{
-                        background: `linear-gradient(135deg, ${vibe.gradient[0]}, ${vibe.gradient[1]})`,
-                      }}
-                    >
-                      {vibe.emoji}
+                    <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden">
+                      <img src={vibe.imageUrl} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[15px] font-semibold truncate text-text-primary leading-tight">
@@ -610,6 +604,8 @@ export default function DashboardClient({
                   onChange={(e) => setCreateName(e.target.value)}
                   placeholder="My Swaplist"
                   className="input-glass w-full"
+                  autoComplete="off"
+                  enterKeyHint="next"
                 />
               </div>
             </div>
@@ -666,12 +662,16 @@ export default function DashboardClient({
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
                 <input
-                  type="text"
+                  type="search"
                   value={playlistFilter}
                   onChange={(e) => setPlaylistFilter(e.target.value)}
                   placeholder="Filter playlists..."
                   className="w-full input-glass"
                   style={{ paddingLeft: '2.5rem' }}
+                  enterKeyHint="search"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
               </div>
             </div>

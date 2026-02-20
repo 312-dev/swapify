@@ -316,6 +316,8 @@ export default function CircleSettingsClient({ circle, isHost }: CircleSettingsC
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="My Circle"
                     className="input-glass w-full"
+                    autoComplete="off"
+                    enterKeyHint="done"
                   />
                 </div>
               </div>

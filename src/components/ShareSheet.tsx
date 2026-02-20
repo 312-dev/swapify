@@ -211,6 +211,8 @@ export default function ShareSheet({
               }}
               className="input-glass flex-1 text-sm"
               required
+              autoComplete="email"
+              enterKeyHint="send"
             />
             <button
               type="submit"

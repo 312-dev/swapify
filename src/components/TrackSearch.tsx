@@ -124,12 +124,16 @@ export default function TrackSearch({ playlistId, onTrackAdded }: TrackSearchPro
           />
         </svg>
         <input
-          type="text"
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
           placeholder="Search for a track to add..."
           className="w-full pl-10 pr-4 py-3 bg-glass border border-glass-border rounded-xl text-base text-text-primary placeholder:text-text-tertiary backdrop-blur-sm focus:outline-none focus:border-brand transition-colors"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
         />
         {isSearching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
