@@ -26,6 +26,13 @@ const eslintConfig = defineConfig([
       'max-lines': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
+  {
+    files: ['**/*.test.ts', 'src/test/**/*.ts'],
+    rules: {
+      'max-lines': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 ]);
 
 export default eslintConfig;
