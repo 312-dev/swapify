@@ -10,6 +10,7 @@ import type {
   SpotifyRecentlyPlayedItem,
   SpotifySearchResult,
   SpotifyPlaylistItem,
+  SpotifyUserPlaylistItem,
 } from '@/types/spotify';
 
 import { trackSpotifyApiCall, waitForBudget, spotifyConfig } from '@/lib/spotify-config';
@@ -219,7 +220,7 @@ export async function updatePlaylistDetails(
   userId: string,
   circleId: string,
   playlistId: string,
-  details: { name?: string; description?: string }
+  details: { name?: string; description?: string; collaborative?: boolean; public?: boolean }
 ): Promise<void> {
   const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}`, {
     method: 'PUT',
@@ -302,22 +303,38 @@ export async function getPlaylistDetails(
   userId: string,
   circleId: string,
   playlistId: string
-): Promise<{ name: string; description: string | null; imageUrl: string | null }> {
+): Promise<{
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  trackCount: number;
+  collaborative: boolean;
+  isPublic: boolean;
+}> {
   const res = await spotifyFetch(
     userId,
     circleId,
-    `/playlists/${playlistId}?fields=name,description,images`
+    `/playlists/${playlistId}?fields=name,description,images,tracks.total,collaborative,public`
   );
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get playlist details: ${res.status} ${err}`);
   }
-  const data: { name: string; description: string | null; images: Array<{ url: string }> } =
-    await res.json();
+  const data: {
+    name: string;
+    description: string | null;
+    images: Array<{ url: string }>;
+    tracks: { total: number };
+    collaborative: boolean;
+    public: boolean;
+  } = await res.json();
   return {
     name: data.name,
     description: data.description || null,
     imageUrl: data.images?.[0]?.url || null,
+    trackCount: data.tracks?.total ?? 0,
+    collaborative: data.collaborative,
+    isPublic: data.public,
   };
 }
 
@@ -346,6 +363,33 @@ export async function getPlaylistItems(
   }
 
   return allItems;
+}
+
+// ─── User's Playlists ───────────────────────────────────────────────────────
+
+export async function getUserPlaylists(
+  userId: string,
+  circleId: string
+): Promise<SpotifyUserPlaylistItem[]> {
+  const allPlaylists: SpotifyUserPlaylistItem[] = [];
+  let url = '/me/playlists?limit=50';
+
+  while (url) {
+    const res = await spotifyFetch(userId, circleId, url);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to get user playlists: ${res.status} ${err}`);
+    }
+    const data: { items: SpotifyUserPlaylistItem[]; next: string | null } = await res.json();
+    allPlaylists.push(...data.items);
+    if (data.next) {
+      url = data.next.replace('https://api.spotify.com/v1', '');
+    } else {
+      url = '';
+    }
+  }
+
+  return allPlaylists;
 }
 
 // ─── Playlist Items ──────────────────────────────────────────────────────────

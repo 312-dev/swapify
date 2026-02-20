@@ -58,6 +58,18 @@ export interface SpotifySearchResult {
   };
 }
 
+export interface SpotifyUserPlaylistItem {
+  id: string;
+  name: string;
+  description: string | null;
+  collaborative: boolean;
+  public: boolean;
+  images: Array<{ url: string; height: number | null; width: number | null }>;
+  tracks: { total: number };
+  owner: { id: string; display_name: string };
+  external_urls: { spotify: string };
+}
+
 export interface SpotifyPaginatedResponse<T> {
   items: T[];
   next: string | null;
