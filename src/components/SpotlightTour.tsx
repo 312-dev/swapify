@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { springs, fade } from '@/lib/motion';
 import {
@@ -104,14 +104,18 @@ export default function SpotlightTour({ onComplete }: { onComplete: () => void }
     });
   }, [currentStep.target]);
 
+  // Calculate rect synchronously before paint to avoid a 1-frame flash
+  // at the old position during step transitions.
+  useLayoutEffect(() => {
+    updateRect(); // eslint-disable-line react-hooks/set-state-in-effect -- sync rect before paint
+  }, [updateRect]);
+
+  // Keep rect in sync on resize/scroll (can use regular useEffect — these
+  // are user-initiated and won't cause a visible flicker).
   useEffect(() => {
-    // Initial rect calculation uses requestAnimationFrame to avoid
-    // synchronous setState within the effect body.
-    const raf = requestAnimationFrame(updateRect);
     window.addEventListener('resize', updateRect);
     window.addEventListener('scroll', updateRect, true);
     return () => {
-      cancelAnimationFrame(raf);
       window.removeEventListener('resize', updateRect);
       window.removeEventListener('scroll', updateRect, true);
     };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
@@ -17,6 +17,7 @@ import OutcastTracksView from '@/components/OutcastTracksView';
 import { Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import ReauthOverlay from '@/components/ReauthOverlay';
+import PlaylistSortControl, { type ClientSortMode } from '@/components/PlaylistSortControl';
 import { useUnreadActivity } from '@/components/UnreadActivityProvider';
 
 interface PlaylistDetailClientProps {
@@ -57,6 +58,7 @@ interface TrackData {
     avatarUrl: string | null;
     hasListened: boolean;
     listenedAt: string | null;
+    listenCount: number;
   }>;
   listenedCount: number;
   totalRequired: number;
@@ -88,6 +90,12 @@ interface LikedTrack {
   addedAt: string;
   removedAt: string | null;
   isActive: boolean;
+  memberListenCounts: Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    listenCount: number;
+  }>;
 }
 
 interface OutcastTrack {
@@ -140,6 +148,9 @@ export default function PlaylistDetailClient({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
+  const [clientSort, setClientSort] = useState<ClientSortMode>('default');
+  const [energyScores, setEnergyScores] = useState<Record<string, number> | null>(null);
+  const [loadingEnergy, setLoadingEnergy] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
   const albumColors = useAlbumColors(currentImageUrl);
   const { markRead } = useUnreadActivity();
@@ -148,6 +159,66 @@ export default function PlaylistDetailClient({
   useEffect(() => {
     markRead({ playlistId });
   }, [markRead, playlistId]);
+
+  // Fetch energy scores lazily when user selects energy sort
+  const fetchEnergyScores = useCallback(async () => {
+    if (energyScores || loadingEnergy) return;
+    setLoadingEnergy(true);
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}/audio-features`);
+      if (res.ok) {
+        const data = await res.json();
+        setEnergyScores(data.energyScores);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingEnergy(false);
+    }
+  }, [playlistId, energyScores, loadingEnergy]);
+
+  function handleSortChange(mode: ClientSortMode) {
+    if ((mode === 'energy_asc' || mode === 'energy_desc') && !energyScores) {
+      fetchEnergyScores();
+    }
+    setClientSort(mode);
+  }
+
+  // Client-side sorted tracks (temporary, resets on refresh)
+  const sortedTracks = useMemo(() => {
+    if (clientSort === 'default') return tracks;
+    const sorted = [...tracks];
+    switch (clientSort) {
+      case 'date_asc':
+        sorted.sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime());
+        break;
+      case 'date_desc':
+        sorted.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+        break;
+      case 'energy_desc':
+        if (energyScores) {
+          sorted.sort(
+            (a, b) =>
+              (energyScores[b.spotifyTrackId] ?? -1) - (energyScores[a.spotifyTrackId] ?? -1)
+          );
+        }
+        break;
+      case 'energy_asc':
+        if (energyScores) {
+          sorted.sort(
+            (a, b) => (energyScores[a.spotifyTrackId] ?? 2) - (energyScores[b.spotifyTrackId] ?? 2)
+          );
+        }
+        break;
+      case 'creator_asc':
+        sorted.sort((a, b) => a.addedBy.displayName.localeCompare(b.addedBy.displayName));
+        break;
+      case 'creator_desc':
+        sorted.sort((a, b) => b.addedBy.displayName.localeCompare(a.addedBy.displayName));
+        break;
+    }
+    return sorted;
+  }, [tracks, clientSort, energyScores]);
 
   const fetchTracks = useCallback(async () => {
     try {
@@ -160,9 +231,10 @@ export default function PlaylistDetailClient({
         setOutcastTracks(data.outcastTracks ?? []);
         setLikedPlaylistId(data.likedPlaylistId ?? null);
         if (data.vibeName !== undefined) setCurrentVibeName(data.vibeName);
-      } else if (res.status === 401) {
-        const data = await res.json();
-        if (data.needsReauth) setNeedsReauth(true);
+      } else {
+        const data = await res.json().catch(() => null);
+        if (data?.needsReauth) setNeedsReauth(true);
+        else if (data?.rateLimited) toast.error(data.error);
       }
     } catch {
       // Silently fail on refresh
@@ -229,9 +301,10 @@ export default function PlaylistDetailClient({
           if (data.metadata.imageUrl !== undefined) setCurrentImageUrl(data.metadata.imageUrl);
         }
         await fetchTracks();
-      } else if (res.status === 401) {
-        const data = await res.json();
-        if (data.needsReauth) setNeedsReauth(true);
+      } else {
+        const data = await res.json().catch(() => null);
+        if (data?.needsReauth) setNeedsReauth(true);
+        else if (data?.rateLimited) toast.error(data.error);
       }
     } catch {
       // Silently fail
@@ -285,7 +358,10 @@ export default function PlaylistDetailClient({
     // Search for the track by ID
     try {
       const searchRes = await fetch(`/api/spotify/search?q=track:${trackId}`);
-      if (!searchRes.ok) throw new Error('Search failed');
+      if (!searchRes.ok) {
+        const searchErr = await searchRes.json().catch(() => null);
+        throw new Error(searchErr?.error || 'Search failed');
+      }
       const searchData = await searchRes.json();
 
       const track = searchData.tracks?.find((t: { id: string }) => t.id === trackId);
@@ -321,26 +397,25 @@ export default function PlaylistDetailClient({
 
   return (
     <main
-      className="min-h-screen"
+      className="min-h-screen gradient-bg-radial"
       ref={dropRef}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Full-bleed album color gradient — overlays the default radial gradient */}
+      {albumColors.isExtracted && (
+        <div
+          className="absolute top-0 sm:-top-20 bottom-0 left-1/2 w-screen -translate-x-1/2 pointer-events-none z-0"
+          aria-hidden="true"
+          style={{ backgroundImage: albumColors.backgroundImage }}
+        />
+      )}
+
       {needsReauth && <ReauthOverlay spotifyClientId={spotifyClientId} circleId={circleId} />}
 
-      {/* Gradient header — dynamic album colors or fallback */}
-      <div
-        className={albumColors.isExtracted ? 'px-5 pt-8 pb-6' : 'gradient-bg-radial px-5 pt-8 pb-6'}
-        style={
-          albumColors.isExtracted
-            ? {
-                backgroundImage: albumColors.backgroundImage,
-                backgroundColor: '#0a0a0a',
-              }
-            : undefined
-        }
-      >
+      {/* Gradient header */}
+      <div className="px-5 pt-8 pb-6 relative z-10">
         {/* Top bar: back + settings */}
         <div className="flex items-center justify-between mb-4">
           <button
@@ -474,7 +549,9 @@ export default function PlaylistDetailClient({
                     </div>
                   )}
                   {m.id === ownerId && (
-                    <Crown className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 text-yellow-400 fill-yellow-400 drop-shadow" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-yellow-400 ring-[1.5px] ring-background flex items-center justify-center">
+                      <Crown className="w-2 h-2 text-black fill-black" />
+                    </div>
                   )}
                 </div>
               ))}
@@ -531,6 +608,17 @@ export default function PlaylistDetailClient({
         outcastCount={outcastTracks.length}
       />
 
+      {/* Client-side sort control (inbox tab only) */}
+      {activeTab === 'inbox' && tracks.length > 1 && (
+        <div className="px-5 mt-3">
+          <PlaylistSortControl
+            sortMode={clientSort}
+            onSortChange={handleSortChange}
+            loadingEnergy={loadingEnergy}
+          />
+        </div>
+      )}
+
       {/* Follow gate banner */}
       {isFollowing === false && (
         <div className="mx-4 mt-4 glass rounded-2xl p-5 text-center">
@@ -568,8 +656,8 @@ export default function PlaylistDetailClient({
 
           {/* Track search */}
           {isFollowing !== false && (
-            <div className="px-5 mt-4 mb-4">
-              <TrackSearch playlistId={playlistId} onTrackAdded={fetchTracks} />
+            <div className="px-5 mt-4 mb-4 relative z-10">
+              <TrackSearch spotifyPlaylistId={spotifyPlaylistId} />
             </div>
           )}
 
@@ -589,11 +677,11 @@ export default function PlaylistDetailClient({
               </div>
             ) : tracks.length === 0 ? (
               <div className="text-center py-12 text-text-tertiary">
-                <p className="text-base">No tracks yet. Search above to add one.</p>
+                <p className="text-base">No tracks yet. Add songs from Spotify to get started.</p>
               </div>
             ) : (
               <AnimatePresence mode="popLayout">
-                {tracks.map((track) => (
+                {sortedTracks.map((track) => (
                   <motion.div
                     key={track.id}
                     layout

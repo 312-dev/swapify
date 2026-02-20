@@ -6,6 +6,7 @@
 
 export type NotificationType =
   | 'newTrack'
+  | 'newSwaplist'
   | 'memberJoined'
   | 'reactions'
   | 'trackRemoved'
@@ -24,6 +25,10 @@ export const NOTIFICATION_TYPE_LABELS: Record<
   { label: string; description: string }
 > = {
   newTrack: { label: 'New tracks', description: 'When someone adds a track' },
+  newSwaplist: {
+    label: 'New Swaplists',
+    description: 'When someone creates a Swaplist in your Circle',
+  },
   memberJoined: { label: 'New members', description: 'When someone joins a Swaplist' },
   reactions: { label: 'Reactions', description: 'When someone reacts to your track' },
   trackRemoved: { label: 'Track removed', description: 'When your track is removed' },
@@ -38,6 +43,7 @@ export const NOTIFICATION_TYPES = Object.keys(NOTIFICATION_TYPE_LABELS) as Notif
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   newTrack: { push: true, email: true },
+  newSwaplist: { push: true, email: true },
   memberJoined: { push: true, email: true },
   reactions: { push: true, email: false },
   trackRemoved: { push: false, email: true },

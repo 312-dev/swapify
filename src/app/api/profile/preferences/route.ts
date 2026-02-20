@@ -15,6 +15,15 @@ export async function PATCH(request: NextRequest) {
 
   const updates: Record<string, boolean | string> = {};
 
+  // Display name
+  if (typeof body.displayName === 'string') {
+    const name = body.displayName.trim();
+    if (name.length === 0 || name.length > 50) {
+      return NextResponse.json({ error: 'Name must be 1-50 characters' }, { status: 400 });
+    }
+    updates.displayName = name;
+  }
+
   // Master toggles
   if (body.notifyPush !== undefined) updates.notifyPush = !!body.notifyPush;
   if (body.notifyEmail !== undefined) updates.notifyEmail = !!body.notifyEmail;

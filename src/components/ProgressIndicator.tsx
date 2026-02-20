@@ -8,6 +8,7 @@ interface MemberProgress {
   avatarUrl: string | null;
   hasListened: boolean;
   listenedAt: string | null;
+  listenCount: number;
 }
 
 interface ProgressIndicatorProps {
@@ -37,6 +38,7 @@ export default function ProgressIndicator({
               size="sm"
               hasListened={member.hasListened}
               listenedAt={member.listenedAt}
+              listenCount={member.listenCount}
             />
           ))}
         </div>

@@ -122,7 +122,7 @@ export function buildSpotifyDescription(
   userDescription: string | null | undefined,
   vibeName: string | null | undefined
 ): string {
-  const base = userDescription || 'A Swapify shared playlist — songs in, listens out';
+  const base = userDescription || '';
   if (!vibeName) return base;
   return `${base}${VIBE_DELIMITER}${vibeName}`;
 }

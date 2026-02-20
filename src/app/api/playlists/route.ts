@@ -12,6 +12,7 @@ import {
   getPlaylistItems,
   addItemsToPlaylist,
   TokenInvalidError,
+  SpotifyRateLimitError,
 } from '@/lib/spotify';
 import { generateId, generateInviteCode, getFirstName, formatPlaylistName } from '@/lib/utils';
 
@@ -46,11 +47,18 @@ export async function GET() {
       (t) => t.addedByUserId !== user.id && !listenedSet.has(`${m.playlist.id}:${t.spotifyTrackId}`)
     ).length;
 
+    const lastTrackDate = activeTracks.reduce<Date | null>((latest, t) => {
+      const d = t.addedAt;
+      return !latest || d > latest ? d : latest;
+    }, null);
+    const lastUpdatedAt = (lastTrackDate ?? m.playlist.createdAt).toISOString();
+
     return {
       ...m.playlist,
       memberCount: m.playlist.members.length,
       activeTrackCount: activeTracks.length,
       unplayedCount,
+      lastUpdatedAt,
       members: m.playlist.members.map((mem) => ({
         id: mem.user.id,
         displayName: mem.user.displayName,
@@ -206,15 +214,40 @@ export async function POST(request: NextRequest) {
         with: { owner: true, members: { with: { user: true } } },
       });
 
+      // Notify circle members about new swaplist (fire-and-forget)
+      import('@/lib/notifications').then(({ notifyCircleMembers }) => {
+        notifyCircleMembers(
+          circleId,
+          user.id,
+          {
+            title: 'New Swaplist created',
+            body: `${user.displayName} created "${playlistName}"`,
+            url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
+          },
+          'newSwaplist'
+        );
+      });
+
       return NextResponse.json({ ...playlist, inviteCode });
     } catch (err) {
+      if (err instanceof SpotifyRateLimitError) {
+        return NextResponse.json(
+          {
+            error: 'Spotify is a bit busy right now. Please try again in a minute.',
+            rateLimited: true,
+          },
+          { status: 429 }
+        );
+      }
       if (err instanceof TokenInvalidError) {
         return NextResponse.json(
           { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
           { status: 401 }
         );
       }
-      throw err;
+      console.error('Failed to import playlist:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 
@@ -238,7 +271,7 @@ export async function POST(request: NextRequest) {
     await db.insert(playlists).values({
       id: playlistId,
       name: defaultName,
-      description: description || 'A Swapify shared playlist — songs in, listens out',
+      description: description || null,
       spotifyPlaylistId: spotifyPlaylist.id,
       ownerId: user.id,
       circleId,
@@ -258,18 +291,45 @@ export async function POST(request: NextRequest) {
       with: { owner: true, members: { with: { user: true } } },
     });
 
+    // Notify circle members about new swaplist (fire-and-forget)
+    import('@/lib/notifications').then(({ notifyCircleMembers }) => {
+      notifyCircleMembers(
+        circleId,
+        user.id,
+        {
+          title: 'New Swaplist created',
+          body: `${user.displayName} created "${defaultName}"`,
+          url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
+        },
+        'newSwaplist'
+      );
+    });
+
     return NextResponse.json({
       ...playlist,
       inviteCode,
       spotifyUrl: spotifyPlaylist.external_urls.spotify,
     });
   } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     if (err instanceof TokenInvalidError) {
       return NextResponse.json(
         { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
         { status: 401 }
       );
     }
-    throw err;
+    console.error('Failed to create playlist:', err);
+    const errObj = err as Record<string, unknown>;
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const detail = errObj?.cause ?? errObj?.detail ?? errObj?.code ?? null;
+    return NextResponse.json({ error: message, detail }, { status: 500 });
   }
 }

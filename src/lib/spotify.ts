@@ -33,6 +33,17 @@ export class TokenInvalidError extends Error {
   }
 }
 
+/** Thrown when Spotify returns 429 and all retries are exhausted. */
+export class SpotifyRateLimitError extends Error {
+  constructor(
+    public path: string,
+    public retryAfterSeconds: number
+  ) {
+    super(`Spotify rate limit on ${path} — retry after ${retryAfterSeconds}s`);
+    this.name = 'SpotifyRateLimitError';
+  }
+}
+
 // Per-user-per-circle mutex: dedup concurrent refresh attempts so only one hits Spotify
 const inflightRefreshes = new Map<string, Promise<string>>();
 
@@ -153,6 +164,68 @@ export function rateLimitRemainingMs(): number {
   return Math.max(0, rateLimitedUntil - Date.now());
 }
 
+// ─── API Call Log (rolling window for debugging rate limits) ─────────────────
+
+const MAX_CALL_LOG = 50;
+const apiCallLog: {
+  ts: number;
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+}[] = [];
+
+const isLocalDev = !process.env.DATABASE_URL;
+let fsModule: typeof import('fs') | null = null;
+if (isLocalDev) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    fsModule = require('fs');
+  } catch {
+    // noop — fs unavailable in edge runtime
+  }
+}
+
+function logApiCall(method: string, path: string, status: number, durationMs: number) {
+  apiCallLog.push({ ts: Date.now(), method, path, status, durationMs });
+  if (apiCallLog.length > MAX_CALL_LOG) apiCallLog.shift();
+
+  let emoji = '✓';
+  if (status === 429) emoji = '🚫';
+  else if (status >= 400) emoji = '⚠️';
+  logger.info(`[Spotify API] ${emoji} ${method} ${path} → ${status} (${durationMs}ms)`);
+
+  // In local dev, append to spotify-requests.log
+  if (fsModule) {
+    const line =
+      JSON.stringify({
+        time: new Date().toISOString(),
+        method,
+        path,
+        status,
+        durationMs,
+      }) + '\n';
+    fsModule.appendFile('spotify-requests.log', line, () => {});
+  }
+}
+
+function dumpRecentCalls() {
+  const now = Date.now();
+  const last30s = apiCallLog.filter((c) => now - c.ts < 30_000);
+  const last60s = apiCallLog.filter((c) => now - c.ts < 60_000);
+  logger.warn(
+    {
+      last30s: last30s.length,
+      last60s: last60s.length,
+      recentCalls: last60s.map((c) => ({
+        ago: `${((now - c.ts) / 1000).toFixed(1)}s`,
+        call: `${c.method} ${c.path} → ${c.status}`,
+      })),
+    },
+    '[Spotify API] 429 hit — dumping recent call history'
+  );
+}
+
 // ─── Core Fetch Wrapper ──────────────────────────────────────────────────────
 
 async function spotifyFetch(
@@ -162,9 +235,14 @@ async function spotifyFetch(
   options: RequestInit = {},
   retries = 3
 ): Promise<Response> {
+  const method = (options.method || 'GET').toUpperCase();
+
   // Respect app-level rate limit before making a request
   const waitMs = rateLimitRemainingMs();
   if (waitMs > 0) {
+    logger.warn(
+      `[Spotify API] Rate limited, waiting ${Math.round(waitMs / 1000)}s before ${method} ${path}`
+    );
     await new Promise((r) => setTimeout(r, waitMs));
   }
 
@@ -174,6 +252,7 @@ async function spotifyFetch(
   const token = await refreshAccessToken(userId, circleId);
 
   trackSpotifyApiCall();
+  const start = Date.now();
   const res = await fetch(`${SPOTIFY_API}${path}`, {
     ...options,
     headers: {
@@ -182,15 +261,24 @@ async function spotifyFetch(
       ...options.headers,
     },
   });
+  const durationMs = Date.now() - start;
+
+  logApiCall(method, path, res.status, durationMs);
 
   if (res.status === 429) {
-    const retryAfter = Number.parseInt(res.headers.get('Retry-After') || '1', 10);
+    const rawRetryAfter = res.headers.get('Retry-After') || '1';
+    const retryAfter = Math.min(Number.parseInt(rawRetryAfter, 10) || 1, 60);
+    logger.warn(
+      `[Spotify API] 429 on ${path} — Retry-After: ${rawRetryAfter}s (capped to ${retryAfter}s)`
+    );
+    dumpRecentCalls();
     // Set app-level cooldown so other callers also back off
     rateLimitedUntil = Date.now() + retryAfter * 1000;
     if (retries > 0) {
       await new Promise((r) => setTimeout(r, retryAfter * 1000));
       return spotifyFetch(userId, circleId, path, options, retries - 1);
     }
+    throw new SpotifyRateLimitError(path, retryAfter);
   }
 
   if (res.status === 401 && retries > 0) {
@@ -229,7 +317,7 @@ export async function createPlaylist(
     method: 'POST',
     body: JSON.stringify({
       name,
-      description: description || 'A Swapify shared playlist — songs in, listens out',
+      description: description || '',
       public: false,
       collaborative,
     }),
@@ -281,7 +369,11 @@ export async function uploadPlaylistImage(
   });
 
   if (res.status === 429) {
-    const retryAfter = Number.parseInt(res.headers.get('Retry-After') || '5', 10);
+    const rawRetryAfter = res.headers.get('Retry-After') || '5';
+    const retryAfter = Math.min(Number.parseInt(rawRetryAfter, 10) || 5, 60);
+    console.warn(
+      `[spotifyFetch] 429 on image upload — Retry-After: ${rawRetryAfter} (capped to ${retryAfter}s)`
+    );
     rateLimitedUntil = Date.now() + retryAfter * 1000;
     throw new Error(`Playlist image upload rate-limited, retry after ${retryAfter}s`);
   }
@@ -591,4 +683,30 @@ export async function reorderPlaylistTracks(
     throw new Error(`Failed to reorder playlist: ${res.status} ${err}`);
   }
   return res.json();
+}
+
+// ─── Audio Features ──────────────────────────────────────────────────────────
+
+export async function getAudioFeatures(
+  userId: string,
+  circleId: string,
+  trackIds: string[]
+): Promise<Record<string, number>> {
+  const energyMap: Record<string, number> = {};
+  // Spotify supports up to 100 IDs per request
+  for (let i = 0; i < trackIds.length; i += 100) {
+    const batch = trackIds.slice(i, i + 100);
+    const res = await spotifyFetch(userId, circleId, `/audio-features?ids=${batch.join(',')}`);
+    if (!res.ok) {
+      logger.warn({ status: res.status }, 'Failed to fetch audio features batch');
+      continue;
+    }
+    const data = await res.json();
+    for (const feature of data.audio_features ?? []) {
+      if (feature?.id && typeof feature.energy === 'number') {
+        energyMap[feature.id] = feature.energy;
+      }
+    }
+  }
+  return energyMap;
 }

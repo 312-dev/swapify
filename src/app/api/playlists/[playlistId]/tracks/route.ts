@@ -16,6 +16,7 @@ import {
   checkSavedTracks,
   isRateLimited,
   TokenInvalidError,
+  SpotifyRateLimitError,
 } from '@/lib/spotify';
 import { generateId } from '@/lib/utils';
 
@@ -68,6 +69,15 @@ export async function GET(
         return posA - posB;
       });
     } catch (err) {
+      if (err instanceof SpotifyRateLimitError) {
+        return NextResponse.json(
+          {
+            error: 'Spotify is a bit busy right now. Please try again in a minute.',
+            rateLimited: true,
+          },
+          { status: 429 }
+        );
+      }
       if (err instanceof TokenInvalidError) {
         return NextResponse.json(
           { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
@@ -150,6 +160,7 @@ export async function GET(
         ...member,
         hasListened: !!listen || !!reaction,
         listenedAt: listen?.listenedAt ?? reaction?.createdAt ?? null,
+        listenCount: listen?.listenCount ?? 0,
       };
     });
 
@@ -226,21 +237,35 @@ export async function GET(
   const allDbTracks = [...tracks, ...removedTracks];
   const likedTracks = allDbTracks
     .filter((t) => userLikedTrackIds.has(t.spotifyTrackId))
-    .map((track) => ({
-      spotifyTrackId: track.spotifyTrackId,
-      spotifyTrackUri: track.spotifyTrackUri,
-      trackName: track.trackName,
-      artistName: track.artistName,
-      albumImageUrl: track.albumImageUrl,
-      addedBy: {
-        id: track.addedBy.id,
-        displayName: track.addedBy.displayName,
-        avatarUrl: track.addedBy.avatarUrl,
-      },
-      addedAt: track.addedAt,
-      removedAt: track.removedAt,
-      isActive: !track.removedAt,
-    }));
+    .map((track) => {
+      const trackListenRecords = listens.filter((l) => l.spotifyTrackId === track.spotifyTrackId);
+      const memberListenCounts = memberList.map((member) => {
+        const listen = trackListenRecords.find((l) => l.userId === member.id);
+        return {
+          userId: member.id,
+          displayName: member.displayName,
+          avatarUrl: member.avatarUrl,
+          listenCount: listen?.listenCount ?? 0,
+        };
+      });
+
+      return {
+        spotifyTrackId: track.spotifyTrackId,
+        spotifyTrackUri: track.spotifyTrackUri,
+        trackName: track.trackName,
+        artistName: track.artistName,
+        albumImageUrl: track.albumImageUrl,
+        addedBy: {
+          id: track.addedBy.id,
+          displayName: track.addedBy.displayName,
+          avatarUrl: track.addedBy.avatarUrl,
+        },
+        addedAt: track.addedAt,
+        removedAt: track.removedAt,
+        isActive: !track.removedAt,
+        memberListenCounts,
+      };
+    });
 
   // Outcast tracks: removed tracks where current user does NOT have thumbs_up
   const outcastTracks = removedTracks
@@ -362,6 +387,15 @@ export async function POST(
       spotifyTrackUri,
     ]);
   } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     if (err instanceof TokenInvalidError) {
       return NextResponse.json(
         { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
@@ -410,32 +444,35 @@ export async function POST(
   });
 
   // Auto-like: check if other members already have this track saved in their library
-  (async () => {
-    try {
-      const { setAutoReaction } = await import('@/lib/polling');
-      const otherMembers = (
-        await db.query.playlistMembers.findMany({
-          where: eq(playlistMembers.playlistId, playlistId),
-        })
-      ).filter((m) => m.userId !== user.id);
+  // Only runs if the host has auto-reactions enabled for this playlist
+  if (playlist.autoReactionsEnabled) {
+    (async () => {
+      try {
+        const { setAutoReaction } = await import('@/lib/polling');
+        const otherMembers = (
+          await db.query.playlistMembers.findMany({
+            where: eq(playlistMembers.playlistId, playlistId),
+          })
+        ).filter((m) => m.userId !== user.id);
 
-      for (const member of otherMembers) {
-        if (isRateLimited()) break;
-        try {
-          const [isSaved] = await checkSavedTracks(member.userId, playlist.circleId, [
-            spotifyTrackId,
-          ]);
-          if (isSaved) {
-            await setAutoReaction(playlistId, spotifyTrackId, member.userId, 'thumbs_up');
+        for (const member of otherMembers) {
+          if (isRateLimited()) break;
+          try {
+            const [isSaved] = await checkSavedTracks(member.userId, playlist.circleId, [
+              spotifyTrackId,
+            ]);
+            if (isSaved) {
+              await setAutoReaction(playlistId, spotifyTrackId, member.userId, 'thumbs_up');
+            }
+          } catch {
+            // Token expired or rate limited — skip this member
           }
-        } catch {
-          // Token expired or rate limited — skip this member
         }
+      } catch (err) {
+        console.error('[Swapify] Auto-like library check failed:', err);
       }
-    } catch (err) {
-      console.error('[Swapify] Auto-like library check failed:', err);
-    }
-  })();
+    })();
+  }
 
   return NextResponse.json({ id: trackId, success: true });
 }

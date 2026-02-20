@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers, users } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { checkFollowPlaylist } from '@/lib/spotify';
+import { checkFollowPlaylist, SpotifyRateLimitError } from '@/lib/spotify';
 
 // GET /api/playlists/[playlistId]/follow-status — check if user follows on Spotify
 export async function GET(
@@ -44,7 +44,16 @@ export async function GET(
       dbUser.spotifyId
     );
     return NextResponse.json({ isFollowing });
-  } catch {
+  } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     // If Spotify check fails, assume following to avoid blocking the user
     return NextResponse.json({ isFollowing: true });
   }

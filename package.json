@@ -18,6 +18,7 @@
     "db:migrate": "npx tsx src/db/migrate.ts",
     "db:generate": "drizzle-kit generate",
     "db:seed": "npx tsx src/db/seed.ts",
+    "db:validate": "npx tsx src/db/validate-migrations.ts",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -49,6 +50,7 @@
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-icons": "^5.5.0",
     "resend": "^6.9.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",

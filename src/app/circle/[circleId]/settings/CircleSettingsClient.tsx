@@ -166,7 +166,7 @@ export default function CircleSettingsClient({ circle, isHost }: CircleSettingsC
   }
 
   function handleCopyShareLink() {
-    const link = `${window.location.origin}/circle/join?code=${circle.inviteCode}`;
+    const link = `${process.env.NEXT_PUBLIC_APP_URL}/circle/join?code=${circle.inviteCode}`;
     navigator.clipboard.writeText(link).then(() => {
       setLinkCopied(true);
       toast.success('Share link copied');
@@ -390,7 +390,7 @@ export default function CircleSettingsClient({ circle, isHost }: CircleSettingsC
             </div>
             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
               <p className="text-xs text-text-tertiary truncate flex-1 select-all">
-                {typeof window !== 'undefined' ? window.location.origin : ''}/circle/join?code=
+                {process.env.NEXT_PUBLIC_APP_URL}/circle/join?code=
                 {circle.inviteCode}
               </p>
               <button

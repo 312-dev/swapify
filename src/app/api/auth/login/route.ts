@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
     'user-read-currently-playing',
     'user-library-read',
     'user-library-modify',
+    'ugc-image-upload',
   ].join(' ');
 
   const params = new URLSearchParams({

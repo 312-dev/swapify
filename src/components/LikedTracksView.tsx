@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
 import AlbumArt from '@/components/AlbumArt';
+import { Repeat2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LikedTrack {
@@ -16,6 +17,12 @@ interface LikedTrack {
   addedAt: string;
   removedAt: string | null;
   isActive: boolean;
+  memberListenCounts: Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    listenCount: number;
+  }>;
 }
 
 interface LikedTracksViewProps {
@@ -156,6 +163,20 @@ export default function LikedTracksView({
                   <span className="text-text-tertiary"> · {track.addedBy.displayName}</span>
                 </p>
               </div>
+              {track.memberListenCounts?.some((m) => m.listenCount > 0) && (
+                <div
+                  className="flex items-center gap-0.5 text-text-tertiary shrink-0"
+                  data-tooltip={track.memberListenCounts
+                    .filter((m) => m.listenCount > 0)
+                    .map((m) => `${m.displayName}: ${m.listenCount}x`)
+                    .join(', ')}
+                >
+                  <Repeat2 className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">
+                    {track.memberListenCounts.reduce((sum, m) => sum + m.listenCount, 0)}
+                  </span>
+                </div>
+              )}
               {!track.isActive && (
                 <span className="text-xs text-text-tertiary shrink-0">Played</span>
               )}

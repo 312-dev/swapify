@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, getSession } from '@/lib/auth';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
-import { searchTracks } from '@/lib/spotify';
+import { searchTracks, SpotifyRateLimitError } from '@/lib/spotify';
 
 // GET /api/spotify/search?q=...
 export async function GET(request: NextRequest) {
@@ -22,21 +22,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ tracks: [] });
   }
 
-  const tracks = await searchTracks(user.id, circleId, query.trim());
+  try {
+    const tracks = await searchTracks(user.id, circleId, query.trim());
 
-  return NextResponse.json({
-    tracks: tracks.map((t) => ({
-      id: t.id,
-      uri: t.uri,
-      name: t.name,
-      duration_ms: t.duration_ms,
-      artists: t.artists.map((a) => ({ id: a.id, name: a.name })),
-      album: {
-        id: t.album.id,
-        name: t.album.name,
-        images: t.album.images,
-      },
-      external_urls: t.external_urls,
-    })),
-  });
+    return NextResponse.json({
+      tracks: tracks.map((t) => ({
+        id: t.id,
+        uri: t.uri,
+        name: t.name,
+        duration_ms: t.duration_ms,
+        artists: t.artists.map((a) => ({ id: a.id, name: a.name })),
+        album: {
+          id: t.album.id,
+          name: t.album.name,
+          images: t.album.images,
+        },
+        external_urls: t.external_urls,
+      })),
+    });
+  } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
+    throw err;
+  }
 }

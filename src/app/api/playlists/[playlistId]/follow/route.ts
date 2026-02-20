@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { followPlaylist } from '@/lib/spotify';
+import { followPlaylist, SpotifyRateLimitError } from '@/lib/spotify';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 // POST /api/playlists/[playlistId]/follow — follow the Spotify playlist
@@ -37,6 +37,15 @@ export async function POST(
   try {
     await followPlaylist(user.id, playlist.circleId, playlist.spotifyPlaylistId);
   } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to follow playlist' },
       { status: 500 }

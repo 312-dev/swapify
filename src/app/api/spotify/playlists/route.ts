@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, getSession } from '@/lib/auth';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
-import { getUserPlaylists, TokenInvalidError } from '@/lib/spotify';
+import { getUserPlaylists, TokenInvalidError, SpotifyRateLimitError } from '@/lib/spotify';
 import { db } from '@/db';
 import { playlists } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -43,6 +43,15 @@ export async function GET() {
       })),
     });
   } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     if (err instanceof TokenInvalidError) {
       return NextResponse.json(
         { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },

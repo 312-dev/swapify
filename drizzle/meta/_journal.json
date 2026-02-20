@@ -99,6 +99,27 @@
       "when": 1772500000000,
       "tag": "0019_cap_max_members_to_6",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1772600000000,
+      "tag": "0020_add_listen_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1772700000000,
+      "tag": "0021_add_auto_reactions_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1772800000000,
+      "tag": "0022_unique_spotify_client_id",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ interface MemberBadgeProps {
   size?: 'sm' | 'md' | 'lg';
   hasListened?: boolean;
   listenedAt?: string | null;
+  listenCount?: number;
   tooltip?: string;
 }
 
@@ -15,6 +16,7 @@ export default function MemberBadge({
   size = 'md',
   hasListened,
   listenedAt,
+  listenCount,
   tooltip,
 }: MemberBadgeProps) {
   const sizeClasses = {
@@ -26,7 +28,7 @@ export default function MemberBadge({
   const tooltipText =
     tooltip ||
     (hasListened !== undefined
-      ? `${displayName} ${hasListened ? 'listened' : "hasn't listened yet"}${listenedAt ? ` - ${new Date(listenedAt).toLocaleDateString()}` : ''}`
+      ? `${displayName} ${hasListened ? `listened${listenCount && listenCount > 1 ? ` (${listenCount}x)` : ''}` : "hasn't listened yet"}${listenedAt ? ` - ${new Date(listenedAt).toLocaleDateString()}` : ''}`
       : displayName);
 
   return (

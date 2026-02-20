@@ -4,11 +4,25 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { compressImageForSpotify } from '@/lib/image-compress';
-import { ImagePlus, Pencil, Plus, Search, Download, ChevronRight, ChevronLeft } from 'lucide-react';
+import { extractColors, rgbaCss, darken } from '@/lib/color-extract';
+import {
+  ImagePlus,
+  Pencil,
+  Plus,
+  Search,
+  Download,
+  ChevronRight,
+  ChevronLeft,
+  Sunrise,
+  Sun,
+  Moon,
+} from 'lucide-react';
 import { PlusIcon } from '@/components/icons/PlusIcon';
-import { m } from 'motion/react';
+import { m, AnimatePresence } from 'motion/react';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
 import PlaylistCard from '@/components/PlaylistCard';
+import type { PlaylistData } from '@/components/PlaylistCard';
+import ActivityFeed from '@/components/ActivityFeed';
 import GlassDrawer from '@/components/ui/glass-drawer';
 import {
   Dialog,
@@ -37,26 +51,8 @@ function Spinner() {
   );
 }
 
-interface PlaylistData {
-  id: string;
-  name: string;
-  description: string | null;
-  imageUrl: string | null;
-  vibeName: string | null;
-  memberCount: number;
-  activeTrackCount: number;
-  totalTrackCount: number;
-  likedTrackCount: number;
-  unplayedCount: number;
-  members: Array<{
-    id: string;
-    displayName: string;
-    avatarUrl: string | null;
-  }>;
-}
-
 interface DashboardClientProps {
-  playlists: PlaylistData[];
+  playlists: (PlaylistData & { isMember: boolean })[];
   userName: string;
   spotifyId: string;
   notifyPush: boolean;
@@ -153,15 +149,17 @@ const VIBE_PLACEHOLDERS: Array<{
   },
 ];
 
-function getGreeting(): string {
+function getGreeting(): { text: string; Icon: typeof Sunrise; color: string } {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return { text: 'Good morning', Icon: Sunrise, color: 'text-orange-300' };
+  if (hour < 18) return { text: 'Good afternoon', Icon: Sun, color: 'text-amber-400' };
+  if (hour < 21) return { text: 'Good evening', Icon: Sun, color: 'text-orange-400' };
+  return { text: 'Good evening', Icon: Moon, color: 'text-purple-400' };
 }
 
 export default function DashboardClient({
   playlists,
+  userName,
   spotifyId,
   notifyPush,
   circles,
@@ -172,7 +170,11 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [greeting, setGreeting] = useState('');
+  const [greeting, setGreeting] = useState<{
+    text: string;
+    Icon: typeof Sunrise;
+    color: string;
+  } | null>(null);
   useEffect(() => {
     setGreeting(getGreeting());
   }, []);
@@ -197,12 +199,50 @@ export default function DashboardClient({
     }
   }, [syncCircleId]);
 
+  // View mode — grid (3-col cards) or list (row cards), persisted in localStorage
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  useEffect(() => {
+    const saved = localStorage.getItem('swapify_view_mode');
+    if (saved === 'list' || saved === 'grid') setViewMode(saved);
+  }, []);
+
   const [showCreate, setShowCreate] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
 
   // Find the active circle for the create drawer
   const activeCircle = circles.find((c) => c.id === activeCircleId) ?? null;
+
+  // Circle photo ambient tint — extract dominant colors from circle group photo
+  const [circleTint, setCircleTint] = useState('');
+  const circleImageUrl = activeCircle?.imageUrl ?? null;
+
+  useEffect(() => {
+    if (!circleImageUrl) {
+      setCircleTint('');
+      return;
+    }
+    let cancelled = false;
+
+    extractColors(circleImageUrl).then((colors) => {
+      if (cancelled || !colors) return;
+
+      const darkPrimary = darken(colors.primary, 0.35);
+      const darkSecondary = darken(colors.secondary, 0.25);
+
+      setCircleTint(
+        [
+          `radial-gradient(ellipse 130% 55% at 50% -5%, ${rgbaCss(darkPrimary, 0.55)} 0%, transparent 70%)`,
+          `radial-gradient(ellipse 90% 45% at 85% 15%, ${rgbaCss(darkSecondary, 0.25)} 0%, transparent 55%)`,
+          `radial-gradient(ellipse 70% 35% at 15% 25%, ${rgbaCss(colors.primary, 0.15)} 0%, transparent 45%)`,
+        ].join(', ')
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [circleImageUrl]);
 
   // Create form state
   const [createName, setCreateName] = useState('');
@@ -238,9 +278,20 @@ export default function DashboardClient({
             setShowImport(false);
             return;
           }
+          if (data.rateLimited) {
+            toast.error(
+              data.error || 'Spotify is a bit busy right now. Please try again in a minute.'
+            );
+            setShowImport(false);
+            return;
+          }
+          if (!res.ok) {
+            toast.error(data.error || 'Failed to load playlists');
+            return;
+          }
           setSpotifyPlaylists(data.playlists ?? []);
         })
-        .catch(() => toast.error('Failed to load playlists'))
+        .catch(() => toast.error('Could not reach the server. Please check your connection.'))
         .finally(() => setIsLoadingPlaylists(false));
     }
   }, [showImport]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -304,6 +355,34 @@ export default function DashboardClient({
     setIsImporting(false);
   }
 
+  // Join a circle playlist the user hasn't joined yet
+  const [joiningPlaylistId, setJoiningPlaylistId] = useState<string | null>(null);
+
+  async function handleJoinCirclePlaylist(playlistId: string) {
+    setJoiningPlaylistId(playlistId);
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ circleJoin: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.needsReauth) {
+          setNeedsReauth(true);
+          return;
+        }
+        throw new Error(data.error || 'Failed to join');
+      }
+      toast.success('Joined Swaplist!');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to join');
+    } finally {
+      setJoiningPlaylistId(null);
+    }
+  }
+
   async function handleImport(mode: 'update' | 'duplicate') {
     if (!selectedPlaylist) return;
     setIsImporting(true);
@@ -342,9 +421,12 @@ export default function DashboardClient({
   // No circles at all — user needs to create one
   if (circles.length === 0) {
     return (
-      <div className="flex flex-col">
-        <header className="px-5 pt-6 pb-4">
-          <p className="text-base text-text-secondary">{greeting},</p>
+      <div className="min-h-screen relative gradient-bg">
+        <header className="relative z-1 px-5 pt-6 pb-4">
+          <p className="text-base text-text-secondary flex items-center gap-1.5">
+            {greeting?.Icon && <greeting.Icon className={`w-4 h-4 ${greeting.color}`} />}
+            {greeting?.text},
+          </p>
           <h1 className="text-3xl font-bold text-text-primary mt-1">Welcome to Swapify</h1>
         </header>
 
@@ -372,7 +454,16 @@ export default function DashboardClient({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="min-h-screen relative gradient-bg">
+      {/* Full-bleed circle photo tint — overlays the default gradient when active */}
+      {circleTint && (
+        <div
+          className="absolute top-0 sm:-top-20 bottom-0 left-1/2 w-screen -translate-x-1/2 pointer-events-none z-0"
+          aria-hidden="true"
+          style={{ backgroundImage: circleTint }}
+        />
+      )}
+
       {/* Reauth overlay — blocks the entire app when Spotify token is expired */}
       {needsReauth && (
         <ReauthOverlay
@@ -381,14 +472,30 @@ export default function DashboardClient({
         />
       )}
 
+      {/* Greeting */}
+      <m.header
+        className="relative z-1 px-5 pt-10 pb-2"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...springs.gentle, delay: 0.05 }}
+      >
+        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+          {greeting?.Icon && <greeting.Icon className={`w-5 h-5 ${greeting.color}`} />}
+          {greeting?.text}, {userName.split(' ')[0]}
+        </h1>
+      </m.header>
+
+      {/* Activity feed — cross-circle, above circle switcher */}
+      <ActivityFeed />
+
       {/* Circle switcher — centered at top, Life360 style */}
       {circles.length > 0 && (
         <m.div
-          className="pt-5 pb-2 flex justify-center"
+          className="relative z-1 pt-2 pb-2 flex justify-center"
           data-tour="circle-switcher"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ ...springs.gentle, delay: 0.05 }}
+          transition={{ ...springs.gentle, delay: 0.1 }}
         >
           <CircleSwitcher
             circles={circles}
@@ -398,111 +505,45 @@ export default function DashboardClient({
         </m.div>
       )}
 
-      {/* Header */}
-      <m.header
-        className="px-5 pt-2 pb-4 flex items-start justify-between"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...springs.gentle, delay: 0.1 }}
-      >
-        <div>
-          <p className="text-base text-text-secondary">{greeting},</p>
-          <h1 className="text-3xl font-bold text-text-primary mt-1">Your Swaplists</h1>
-        </div>
-        {playlists.length > 0 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                resetImportState();
-                setShowImport(true);
-              }}
-              className="relative group w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors"
-              aria-label="Import from Spotify"
-            >
-              <Download className="w-5 h-5 text-text-secondary" />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                Import
-              </span>
-            </button>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="relative group w-10 h-10 rounded-full bg-brand flex items-center justify-center"
-              aria-label="Create a Swaplist"
-              data-tour="create-swaplist"
-            >
-              <Plus className="w-5 h-5 text-black" strokeWidth={2.5} />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                Create
-              </span>
-            </button>
-          </div>
-        )}
-      </m.header>
-
-      {/* Playlist list */}
+      {/* Playlist sections — horizontal carousels */}
       {playlists.length === 0 ? (
         <m.div
-          className="px-4 pt-2 pb-6"
+          className="relative z-1 px-4 pt-2 pb-6"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springs.gentle, delay: 0.15 }}
         >
           <div className="relative overflow-hidden">
-            {/* Decorative placeholder cards */}
-            <div className="space-y-2 opacity-40 pointer-events-none">
+            {/* Decorative placeholder cards — horizontal scroll */}
+            <div className="flex gap-3 overflow-x-auto scrollbar-none px-1 pb-2 opacity-40 pointer-events-none">
               {VIBE_PLACEHOLDERS.slice(0, 5).map((vibe, i) => (
                 <div
                   key={vibe.name}
-                  className="glass rounded-2xl p-3.5 w-full text-left overflow-hidden relative"
+                  className="w-40 shrink-0 rounded-xl overflow-hidden relative"
                   style={{
-                    ...(i >= 2 ? { filter: `blur(${(i - 1) * 1.5}px)` } : {}),
+                    ...(i >= 3 ? { filter: `blur(${(i - 2) * 2}px)` } : {}),
                   }}
                 >
-                  {/* Accent tint glow */}
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: `linear-gradient(135deg, hsla(${vibe.accent}, 0.12) 0%, transparent 60%)`,
-                    }}
-                  />
-                  <div className="flex items-center gap-3.5 relative">
-                    <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden">
-                      <img src={vibe.imageUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold truncate text-text-primary leading-tight">
-                        {vibe.name}
-                      </p>
-                      <p
-                        className="text-sm italic truncate mt-0.5"
-                        style={{ color: `hsl(${vibe.accent})` }}
-                      >
-                        {vibe.vibeLine}
-                      </p>
-                      <p className="text-sm text-text-tertiary mt-0.5">{vibe.desc}</p>
-                    </div>
-                    <svg
-                      className="w-4 h-4 text-text-tertiary shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
+                  <div className="w-40 h-40 rounded-xl overflow-hidden">
+                    <img src={vibe.imageUrl} alt="" className="w-full h-full object-cover" />
                   </div>
+                  <p className="text-sm font-semibold truncate text-text-primary mt-2 leading-tight">
+                    {vibe.name}
+                  </p>
+                  <p
+                    className="text-xs italic truncate mt-0.5"
+                    style={{ color: `hsl(${vibe.accent})` }}
+                  >
+                    {vibe.vibeLine}
+                  </p>
                 </div>
               ))}
             </div>
-            {/* Fade + blur overlay */}
+            {/* Fade overlay on right */}
             <div
-              className="absolute inset-x-0 bottom-0 h-32 pointer-events-none backdrop-blur-sm"
+              className="absolute inset-y-0 right-0 w-24 pointer-events-none"
               style={{
-                background: 'linear-gradient(to bottom, transparent, var(--background))',
-                WebkitMaskImage: 'linear-gradient(to bottom, transparent, black)',
-                maskImage: 'linear-gradient(to bottom, transparent, black)',
+                background: 'linear-gradient(to right, transparent, var(--background))',
               }}
             />
             {/* Action buttons — floating centered over the list */}
@@ -533,18 +574,200 @@ export default function DashboardClient({
           </div>
         </m.div>
       ) : (
-        <div className="px-4 space-y-2">
+        <div className="relative z-1 space-y-6">
           <NotificationPrompt notifyPush={notifyPush} />
-          {playlists.map((playlist, i) => (
-            <m.div
-              key={playlist.id}
-              initial={{ opacity: 0, y: 16 }}
+
+          {/* Your Swaplists */}
+          {playlists.some((p) => p.isMember) && (
+            <m.section
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springs.gentle, delay: 0.15 + i * STAGGER_DELAY }}
+              transition={{ ...springs.gentle, delay: 0.15 }}
             >
-              <PlaylistCard playlist={playlist} />
-            </m.div>
-          ))}
+              <div className="flex items-center justify-between px-5 mb-3">
+                <h2 className="text-lg font-bold text-text-primary">Your Swaplists</h2>
+                <div className="flex items-center gap-2">
+                  {/* View mode segmented control */}
+                  <div className="flex items-center rounded-lg bg-white/8 p-0.5">
+                    <button
+                      onClick={() => {
+                        setViewMode('list');
+                        localStorage.setItem('swapify_view_mode', 'list');
+                      }}
+                      className={`relative p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white/15 text-text-primary' : 'text-text-tertiary hover:text-text-secondary'}`}
+                      aria-label="List view"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      >
+                        <line x1="1" y1="3" x2="15" y2="3" />
+                        <line x1="1" y1="8" x2="15" y2="8" />
+                        <line x1="1" y1="13" x2="15" y2="13" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewMode('grid');
+                        localStorage.setItem('swapify_view_mode', 'grid');
+                      }}
+                      className={`relative p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white/15 text-text-primary' : 'text-text-tertiary hover:text-text-secondary'}`}
+                      aria-label="Grid view"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <rect x="1" y="1" width="6" height="6" rx="1.5" />
+                        <rect x="9" y="1" width="6" height="6" rx="1.5" />
+                        <rect x="1" y="9" width="6" height="6" rx="1.5" />
+                        <rect x="9" y="9" width="6" height="6" rx="1.5" />
+                      </svg>
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetImportState();
+                      setShowImport(true);
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors"
+                    aria-label="Import from Spotify"
+                  >
+                    <Download className="w-4 h-4 text-text-secondary" />
+                  </button>
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    className="w-8 h-8 rounded-full bg-brand flex items-center justify-center"
+                    aria-label="Create a Swaplist"
+                    data-tour="create-swaplist"
+                  >
+                    <Plus className="w-4 h-4 text-black" strokeWidth={2.5} />
+                  </button>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {viewMode === 'grid' ? (
+                  <m.div
+                    key="grid"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={springs.snappy}
+                    className="grid grid-cols-3 gap-2.5 px-4 pb-2"
+                  >
+                    {playlists
+                      .filter((p) => p.isMember)
+                      .map((playlist, i) => (
+                        <m.div
+                          key={playlist.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ ...springs.gentle, delay: i * STAGGER_DELAY }}
+                        >
+                          <PlaylistCard playlist={playlist} variant="grid" />
+                        </m.div>
+                      ))}
+                  </m.div>
+                ) : (
+                  <m.div
+                    key="list"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={springs.snappy}
+                    className="flex flex-col gap-2 px-4 pb-2"
+                  >
+                    {playlists
+                      .filter((p) => p.isMember)
+                      .map((playlist, i) => (
+                        <m.div
+                          key={playlist.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ ...springs.gentle, delay: i * STAGGER_DELAY }}
+                        >
+                          <PlaylistCard playlist={playlist} variant="list" />
+                        </m.div>
+                      ))}
+                  </m.div>
+                )}
+              </AnimatePresence>
+            </m.section>
+          )}
+
+          {/* Other Swaplists in this Circle */}
+          {playlists.some((p) => !p.isMember) && (
+            <m.section
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...springs.gentle, delay: 0.25 }}
+            >
+              <div className="flex items-center justify-between px-5 mb-3">
+                <h2 className="text-lg font-bold text-text-primary">Discover</h2>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {viewMode === 'grid' ? (
+                  <m.div
+                    key="discover-grid"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={springs.snappy}
+                    className="grid grid-cols-3 gap-2.5 px-4 pb-2"
+                  >
+                    {playlists
+                      .filter((p) => !p.isMember)
+                      .map((playlist, i) => (
+                        <m.div
+                          key={playlist.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ ...springs.gentle, delay: i * STAGGER_DELAY }}
+                        >
+                          <PlaylistCard
+                            playlist={playlist}
+                            variant="grid"
+                            onJoin={handleJoinCirclePlaylist}
+                            joiningId={joiningPlaylistId}
+                          />
+                        </m.div>
+                      ))}
+                  </m.div>
+                ) : (
+                  <m.div
+                    key="discover-list"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={springs.snappy}
+                    className="flex flex-col gap-2 px-4 pb-2"
+                  >
+                    {playlists
+                      .filter((p) => !p.isMember)
+                      .map((playlist, i) => (
+                        <m.div
+                          key={playlist.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ ...springs.gentle, delay: i * STAGGER_DELAY }}
+                        >
+                          <PlaylistCard
+                            playlist={playlist}
+                            variant="list"
+                            onJoin={handleJoinCirclePlaylist}
+                            joiningId={joiningPlaylistId}
+                          />
+                        </m.div>
+                      ))}
+                  </m.div>
+                )}
+              </AnimatePresence>
+            </m.section>
+          )}
         </div>
       )}
 
@@ -707,17 +930,17 @@ export default function DashboardClient({
         snapPoint="full"
       >
         {importStep === 'browse' && (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col">
             {/* Search bar */}
             <div className="sticky top-0 z-10 pb-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
                 <input
                   type="search"
                   value={playlistFilter}
                   onChange={(e) => setPlaylistFilter(e.target.value)}
                   placeholder="Filter playlists..."
-                  className="w-full input-glass"
+                  className="w-full input-glass backdrop-blur-xl"
                   style={{ paddingLeft: '2.5rem' }}
                   enterKeyHint="search"
                   autoComplete="off"
@@ -747,7 +970,7 @@ export default function DashboardClient({
                 </p>
               </div>
             ) : (
-              <div className="space-y-0.5 overflow-y-auto">
+              <div className="space-y-1">
                 {filteredPlaylists.map((playlist) => (
                   <button
                     key={playlist.id}
@@ -801,13 +1024,15 @@ export default function DashboardClient({
 
                     {/* Playlist info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-medium text-text-primary truncate">
+                      <p className="text-base font-medium text-text-primary truncate">
                         {playlist.name}
                       </p>
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-xs text-text-tertiary">
                         {playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
                         {playlist.alreadyImported && (
-                          <span className="ml-2 text-brand">Already a Swaplist</span>
+                          <span className="ml-2 text-brand/70 text-xs font-medium">
+                            Already a Swaplist
+                          </span>
                         )}
                       </p>
                     </div>

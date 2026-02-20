@@ -8,7 +8,7 @@ import {
   users,
   circleMembers,
 } from '@/db/schema';
-import { eq, and, isNull, isNotNull, inArray, ne, gt, lt } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, inArray, ne, gt, lt, sql } from 'drizzle-orm';
 import {
   getRecentlyPlayed,
   getPlaylistItems,
@@ -27,6 +27,7 @@ import { logger } from '@/lib/logger';
 import { spotifyConfig, isOverBudget } from '@/lib/spotify-config';
 
 const SKIP_THRESHOLD = 0.5; // < 50% listened = skip
+const SNAPSHOT_STALE_MS = 15 * 60 * 1000; // 15 minutes — discard stale snapshots to avoid false skips
 
 interface PlaybackSnapshot {
   trackId: string;
@@ -265,8 +266,16 @@ async function pollUser(
   const currentTrackId = currentPlayback?.item?.id ?? null;
   const isCurrentlyPlaying = currentPlayback?.is_playing ?? false;
 
-  // Skip detection: user switched off a playlist track before finishing
-  if (lastPlayback && isCurrentlyPlaying && currentTrackId !== lastPlayback.trackId) {
+  // Skip detection: user switched off a playlist track before finishing.
+  // Discard stale snapshots (e.g., user closed Spotify hours ago then reopened)
+  // to avoid false skip positives.
+  const snapshotFresh = lastPlayback && Date.now() - lastPlayback.capturedAt < SNAPSHOT_STALE_MS;
+  if (
+    snapshotFresh &&
+    isCurrentlyPlaying &&
+    lastPlayback &&
+    currentTrackId !== lastPlayback.trackId
+  ) {
     counters.skipsDetected += await handleSkipDetection(
       userId,
       user.autoNegativeReactions,
@@ -354,9 +363,19 @@ async function handleSkipDetection(
       }
     }
 
-    // Auto thumbs_down for skip (if user has auto-negative enabled)
+    // Auto thumbs_down for skip (if user has auto-negative enabled AND playlist allows it)
     if (autoNegativeReactions) {
-      await setAutoReaction(playlistTrack.playlistId, lastPlayback.trackId, userId, 'thumbs_down');
+      const playlist = await db.query.playlists.findFirst({
+        where: eq(playlists.id, playlistTrack.playlistId),
+      });
+      if (playlist?.autoReactionsEnabled) {
+        await setAutoReaction(
+          playlistTrack.playlistId,
+          lastPlayback.trackId,
+          userId,
+          'thumbs_down'
+        );
+      }
     }
   }
 
@@ -379,11 +398,10 @@ async function processRecentlyPlayed(
       latestCursor = playedAtMs;
     }
 
-    // Find matching active playlist tracks (not added by this user)
+    // Find matching playlist tracks including archived (not added by this user)
     const matchingTracks = await db.query.playlistTracks.findMany({
       where: and(
         eq(playlistTracks.spotifyTrackId, play.track.id),
-        isNull(playlistTracks.removedAt),
         ne(playlistTracks.addedByUserId, userId)
       ),
     });
@@ -391,7 +409,7 @@ async function processRecentlyPlayed(
     for (const playlistTrack of matchingTracks) {
       if (!(await isPlaylistMember(playlistTrack.playlistId, userId))) continue;
 
-      // Record or upgrade the listen
+      // Record or upgrade the listen (works for both active and archived tracks)
       const recorded = await recordFullListen(
         playlistTrack.playlistId,
         play.track.id,
@@ -401,9 +419,11 @@ async function processRecentlyPlayed(
       );
       if (recorded) counters.listensRecorded++;
 
-      // Check if all members have listened → remove from playlist
-      const removed = await checkAndRemoveIfComplete(playlistTrack);
-      if (removed) counters.tracksRemoved++;
+      // Only check completion for active tracks (not already removed/archived)
+      if (!playlistTrack.removedAt) {
+        const removed = await checkAndRemoveIfComplete(playlistTrack);
+        if (removed) counters.tracksRemoved++;
+      }
     }
   }
 
@@ -447,7 +467,15 @@ async function recordFullListen(
         .where(eq(trackListens.id, existing.id));
       return true;
     }
-    return false;
+    // Increment listen count for repeat full listens
+    await db
+      .update(trackListens)
+      .set({
+        listenCount: sql`${trackListens.listenCount} + 1`,
+        listenedAt,
+      })
+      .where(eq(trackListens.id, existing.id));
+    return false; // return false so listensRecorded counter doesn't double-count first listens
   }
 
   try {
@@ -721,6 +749,9 @@ async function checkSavedTracksForAutoLike(): Promise<void> {
       where: eq(playlists.id, playlistId),
     });
     if (!playlist) continue;
+
+    // Skip playlists where the host has disabled auto-reactions
+    if (!playlist.autoReactionsEnabled) continue;
 
     const members = await db.query.playlistMembers.findMany({
       where: eq(playlistMembers.playlistId, playlistId),

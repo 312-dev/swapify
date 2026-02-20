@@ -43,12 +43,15 @@ export default async function LoginPage({
             'No Spotify app Client ID was provided. Please use an invite link or set up a Spotify app first.'}
           {error === 'dev_mode_user_limit' &&
             'This app is in development mode and has reached its user limit. Contact the developer for access.'}
+          {error === 'client_id_taken' &&
+            'This Spotify Client ID is already registered to another circle. Each client ID can only be used once.'}
           {![
             'no_code',
             'no_verifier',
             'token_exchange',
             'no_client_id',
             'dev_mode_user_limit',
+            'client_id_taken',
           ].includes(error) && `Error: ${error}`}
         </div>
       )}

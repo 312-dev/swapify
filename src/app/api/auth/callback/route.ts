@@ -92,6 +92,17 @@ async function handleCreateCircle(
   tokens: EncryptedTokens,
   rawRefreshToken: string | undefined
 ): Promise<CircleResult | RedirectResult> {
+  // Prevent duplicate circles for the same Spotify client ID
+  const existingCircle = await db.query.circles.findFirst({
+    where: eq(circles.spotifyClientId, spotifyClientId),
+  });
+  if (existingCircle) {
+    logger.warn(
+      `[Swapify] Client ID ${spotifyClientId} already registered to circle ${existingCircle.id}`
+    );
+    return { redirectTo: '/login?error=client_id_taken' };
+  }
+
   // Dev mode: cap check across all circles using this Spotify client ID
   if (spotifyConfig.devMode && isNewUser) {
     const result = await db

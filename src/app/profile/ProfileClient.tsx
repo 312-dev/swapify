@@ -17,9 +17,13 @@ import {
   Heart,
   UserPlus,
   Disc3,
+  ListMusic,
   Star,
   RotateCcw,
   Wand2,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   NOTIFICATION_TYPES,
@@ -109,6 +113,7 @@ async function resetNotificationPrefs(): Promise<boolean> {
 /** Map notification types to distinctive icons */
 const NOTIFICATION_ICONS: Record<NotificationType, typeof Music> = {
   newTrack: Music,
+  newSwaplist: ListMusic,
   memberJoined: UserPlus,
   reactions: Heart,
   trackRemoved: Disc3,
@@ -118,6 +123,11 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Music> = {
 
 function ProfileContent({ user, stats }: ProfileClientProps) {
   const searchParams = useSearchParams();
+
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(user.displayName);
+  const [isSavingName, setIsSavingName] = useState(false);
 
   const [emailInput, setEmailInput] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -131,6 +141,34 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
   const [browserPushState, setBrowserPushState] = useState<
     'granted' | 'denied' | 'default' | 'unsupported' | null
   >(null);
+
+  async function handleSaveName() {
+    const trimmed = nameInput.trim();
+    if (!trimmed || trimmed === displayName) {
+      setIsEditingName(false);
+      setNameInput(displayName);
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      const res = await fetch('/api/profile/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to update name');
+      }
+      setDisplayName(trimmed);
+      setIsEditingName(false);
+      toast.info('Name updated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update name');
+    } finally {
+      setIsSavingName(false);
+    }
+  }
 
   // Detect browser notification permission and sync push toggle
   useEffect(() => {
@@ -169,6 +207,13 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
     e.preventDefault();
     setIsSaving(true);
     setMessage(null);
+
+    if (user.email && emailInput.toLowerCase() === user.email.toLowerCase()) {
+      setMessage({ type: 'error', text: 'This is already your verified email' });
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/profile/email', {
         method: 'POST',
@@ -347,14 +392,65 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
         </m.div>
 
         {/* Display name */}
-        <m.h1
-          className="relative z-10 mt-3.5 text-2xl font-display font-semibold text-text-primary tracking-tight"
+        <m.div
+          className="relative z-10 mt-3.5 flex items-center gap-2"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springs.gentle, delay: 0.1 }}
         >
-          {user.displayName}
-        </m.h1>
+          {isEditingName ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveName();
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                className="input-glass text-center text-xl font-display font-semibold w-48"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                maxLength={50}
+                autoFocus
+                disabled={isSavingName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setIsEditingName(false);
+                    setNameInput(displayName);
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                disabled={isSavingName}
+                className="w-7 h-7 rounded-full bg-brand/20 hover:bg-brand/30 flex items-center justify-center transition-colors"
+              >
+                <Check className="w-3.5 h-3.5 text-brand" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingName(false);
+                  setNameInput(displayName);
+                }}
+                className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+              >
+                <X className="w-3.5 h-3.5 text-text-tertiary" />
+              </button>
+            </form>
+          ) : (
+            <button
+              onClick={() => setIsEditingName(true)}
+              className="group flex items-center gap-2 cursor-pointer"
+            >
+              <h1 className="text-2xl font-display font-semibold text-text-primary">
+                {displayName}
+              </h1>
+              <Pencil className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
+        </m.div>
 
         {/* Stats row */}
         <m.div
@@ -365,7 +461,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
         >
           <div className="flex flex-col items-center gap-0.5">
             <div className="flex items-center gap-1.5 text-brand">
-              <Disc3 className="w-3.5 h-3.5" />
+              <ListMusic className="w-3.5 h-3.5" />
               <span className="text-xl font-heading font-bold tabular-nums">{stats.jamCount}</span>
             </div>
             <span className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
@@ -619,7 +715,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
             <ToggleRow
               icon={<Wand2 className="w-[18px] h-[18px] text-accent-green" />}
               label="Auto-reactions"
-              description="Skip = thumbs down, save to library = thumbs up"
+              description="Skip = 👎, save to library = 👍"
               enabled={user.autoNegativeReactions}
               onChange={(v) => updatePreference('autoNegativeReactions', v)}
             />

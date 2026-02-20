@@ -14,6 +14,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
   }
 
+  if (email.toLowerCase() === user.email?.toLowerCase()) {
+    return NextResponse.json({ error: 'This is already your verified email' }, { status: 400 });
+  }
+
   const token = nanoid(32);
   const expiry = Date.now() + 60 * 60 * 1000;
 

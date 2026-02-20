@@ -1,4 +1,18 @@
 import 'dotenv/config';
+import { cleanPgliteLock, markCleanShutdown, wipePgliteData } from './pglite-lock';
+
+async function migratePglite(dataPath: string) {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle } = await import('drizzle-orm/pglite');
+  const { migrate } = await import('drizzle-orm/pglite/migrator');
+  cleanPgliteLock(dataPath);
+  const client = new PGlite(dataPath);
+  const db = drizzle(client);
+  console.log('Running migrations against PGlite...');
+  await migrate(db, { migrationsFolder: './drizzle' });
+  await client.close();
+  markCleanShutdown(dataPath);
+}
 
 async function main() {
   if (process.env.DATABASE_URL) {
@@ -14,16 +28,16 @@ async function main() {
     await migrate(db, { migrationsFolder: './drizzle' });
     await pool.end();
   } else {
-    // Local: PGlite
-    const { PGlite } = await import('@electric-sql/pglite');
-    const { drizzle } = await import('drizzle-orm/pglite');
-    const { migrate } = await import('drizzle-orm/pglite/migrator');
     const dataPath = process.env.DATABASE_PATH ?? './data/swapify-pg';
-    const client = new PGlite(dataPath);
-    const db = drizzle(client);
-    console.log('Running migrations against PGlite...');
-    await migrate(db, { migrationsFolder: './drizzle' });
-    await client.close();
+    try {
+      await migratePglite(dataPath);
+    } catch {
+      // PGlite data is likely corrupted from a dirty shutdown.
+      // Wipe and recreate — local dev data is always rebuildable from migrations.
+      console.warn('PGlite data appears corrupted, wiping and recreating...');
+      wipePgliteData(dataPath);
+      await migratePglite(dataPath);
+    }
   }
   console.log('Migrations complete!');
 }

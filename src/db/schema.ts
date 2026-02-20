@@ -46,7 +46,10 @@ export const circles = pgTable(
     maxMembers: integer('max_members').notNull().default(6),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('circles_host_user_idx').on(table.hostUserId)]
+  (table) => [
+    uniqueIndex('circles_host_user_idx').on(table.hostUserId),
+    uniqueIndex('circles_spotify_client_id_idx').on(table.spotifyClientId),
+  ]
 );
 
 // ─── Circle Members ──────────────────────────────────────────────────────────
@@ -92,6 +95,7 @@ export const playlists = pgTable('playlists', {
   maxTrackAgeDays: integer('max_track_age_days').notNull().default(7),
   removalDelay: text('removal_delay').notNull().default('immediate'),
   sortMode: text('sort_mode').notNull().default('order_added'),
+  autoReactionsEnabled: boolean('auto_reactions_enabled').notNull().default(true),
   vibeName: text('vibe_name'),
   vibeDescriptionSyncedAt: timestamp('vibe_description_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -158,6 +162,7 @@ export const trackListens = pgTable(
     listenedAt: timestamp('listened_at', { withTimezone: true }).notNull(),
     listenDurationMs: integer('listen_duration_ms'),
     wasSkipped: boolean('was_skipped').notNull().default(false),
+    listenCount: integer('listen_count').notNull().default(1),
   },
   (table) => [
     uniqueIndex('track_listens_playlist_track_user_idx').on(

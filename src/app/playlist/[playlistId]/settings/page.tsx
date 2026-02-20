@@ -32,6 +32,7 @@ export default function PlaylistSettingsPage() {
   const [maxTrackAgeDays, setMaxTrackAgeDays] = useState(7);
   const [removalDelay, setRemovalDelay] = useState('immediate');
   const [sortMode, setSortMode] = useState<SortMode>('order_added');
+  const [autoReactionsEnabled, setAutoReactionsEnabled] = useState(true);
 
   // Load current playlist data
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function PlaylistSettingsPage() {
         setMaxTrackAgeDays(data.maxTrackAgeDays ?? 7);
         setRemovalDelay(data.removalDelay || 'immediate');
         setSortMode(data.sortMode || 'order_added');
+        setAutoReactionsEnabled(data.autoReactionsEnabled ?? true);
       });
   }, [playlistId]);
 
@@ -56,6 +58,7 @@ export default function PlaylistSettingsPage() {
         maxTrackAgeDays,
         removalDelay,
         sortMode,
+        autoReactionsEnabled,
       };
 
       const res = await fetch(`/api/playlists/${playlistId}`, {
@@ -252,6 +255,40 @@ export default function PlaylistSettingsPage() {
                 Tracks will stick around for{' '}
                 {formatRemovalDelay(removalDelay as RemovalDelay).toLowerCase()} after everyone has
                 heard them.
+              </p>
+            )}
+          </div>
+
+          {/* Auto-reactions */}
+          <div className="glass rounded-xl p-5 mt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1">
+                <h2 className="text-base font-medium text-text-secondary">Auto-reactions</h2>
+                <p className="text-sm text-text-tertiary mt-1">
+                  Allow automatic thumbs up/down based on listening behavior (skip = thumbs down,
+                  save to library = thumbs up). Only triggers for members who also have
+                  auto-reactions turned on in their own profile.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoReactionsEnabled}
+                onClick={() => setAutoReactionsEnabled(!autoReactionsEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  autoReactionsEnabled ? 'bg-brand' : 'bg-white/10'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${
+                    autoReactionsEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            {!autoReactionsEnabled && (
+              <p className="text-sm text-text-tertiary mt-2">
+                Auto-reactions are off for this Swaplist. Members will need to react manually.
               </p>
             )}
           </div>

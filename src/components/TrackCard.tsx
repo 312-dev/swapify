@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircleHeart } from 'lucide-react';
+import { MessageCircleHeart, Repeat2 } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils';
 import AlbumArt from '@/components/AlbumArt';
 import NowPlayingIndicator, { type ActiveListener } from '@/components/NowPlayingIndicator';
@@ -27,6 +27,7 @@ interface TrackCardProps {
       avatarUrl: string | null;
       hasListened: boolean;
       listenedAt: string | null;
+      listenCount: number;
     }>;
     listenedCount: number;
     totalRequired: number;
@@ -228,6 +229,23 @@ export default function TrackCard({
             {isComplete ? '\u2713' : `${track.listenedCount}/${track.totalRequired}`}
           </span>
         </div>
+
+        {/* Listen count */}
+        {(() => {
+          const totalListens = track.progress.reduce((sum, p) => sum + p.listenCount, 0);
+          return totalListens > 0 ? (
+            <div
+              className="flex items-center gap-0.5 text-text-tertiary"
+              data-tooltip={track.progress
+                .filter((p) => p.listenCount > 0)
+                .map((p) => `${p.displayName}: ${p.listenCount}x`)
+                .join(', ')}
+            >
+              <Repeat2 className="w-3 h-3" />
+              <span className="text-[10px] font-medium">{totalListens}</span>
+            </div>
+          ) : null;
+        })()}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Epilogue, Geist_Mono, Montserrat } from 'next/font/google';
+import { Gabarito, Geist_Mono, Montserrat, Plus_Jakarta_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 import './globals.css';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
@@ -7,9 +7,10 @@ import InstallPrompt from '@/components/InstallPrompt';
 import LayoutShell from '@/components/LayoutShell';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { getSession } from '@/lib/auth';
 
-const epilogue = Epilogue({
-  variable: '--font-epilogue',
+const gabarito = Gabarito({
+  variable: '--font-gabarito',
   subsets: ['latin'],
 });
 
@@ -29,6 +30,12 @@ const montserrat = Montserrat({
   variable: '--font-montserrat',
   subsets: ['latin'],
   weight: ['600', '700'],
+});
+
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: '--font-jakarta',
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
 });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swapify.312.dev';
@@ -74,23 +81,28 @@ export const viewport: Viewport = {
   interactiveWidget: 'resizes-content',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+  const user = session.userId
+    ? { displayName: session.displayName ?? '', avatarUrl: session.avatarUrl ?? null }
+    : undefined;
+
   return (
     <html lang="en" className="dark">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body
-        className={`${epilogue.variable} ${calSans.variable} ${geistMono.variable} ${montserrat.variable} antialiased bg-background text-foreground min-h-screen grain-overlay`}
+        className={`${gabarito.variable} ${plusJakarta.variable} ${calSans.variable} ${geistMono.variable} ${montserrat.variable} antialiased bg-background text-foreground min-h-screen grain-overlay`}
       >
         <ServiceWorkerRegister />
         <InstallPrompt />
         <TooltipProvider>
-          <LayoutShell>{children}</LayoutShell>
+          <LayoutShell user={user}>{children}</LayoutShell>
         </TooltipProvider>
         <Toaster />
       </body>

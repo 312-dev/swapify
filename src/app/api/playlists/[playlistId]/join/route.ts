@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
-import { playlists, playlistMembers, playlistTracks } from '@/db/schema';
+import { playlists, playlistMembers, playlistTracks, circleMembers } from '@/db/schema';
 import { eq, and, isNull, isNotNull } from 'drizzle-orm';
-import { followPlaylist, updatePlaylistDetails, TokenInvalidError } from '@/lib/spotify';
+import {
+  followPlaylist,
+  updatePlaylistDetails,
+  TokenInvalidError,
+  SpotifyRateLimitError,
+} from '@/lib/spotify';
 import { generateId, formatPlaylistName, getFirstName } from '@/lib/utils';
 
-// POST /api/playlists/[playlistId]/join — join via invite code
+// POST /api/playlists/[playlistId]/join — join via invite code or circle membership
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playlistId: string }> }
@@ -14,7 +19,7 @@ export async function POST(
   const user = await requireAuth();
   const { playlistId } = await params;
   const body = await request.json();
-  const { inviteCode } = body;
+  const { inviteCode, circleJoin } = body;
 
   const playlist = await db.query.playlists.findFirst({
     where: eq(playlists.id, playlistId),
@@ -25,7 +30,15 @@ export async function POST(
     return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
   }
 
-  if (playlist.inviteCode !== inviteCode) {
+  // Authorization: invite code OR circle membership
+  if (circleJoin) {
+    const membership = await db.query.circleMembers.findFirst({
+      where: and(eq(circleMembers.circleId, playlist.circleId), eq(circleMembers.userId, user.id)),
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Not a member of this circle' }, { status: 403 });
+    }
+  } else if (playlist.inviteCode !== inviteCode) {
     return NextResponse.json({ error: 'Invalid invite code' }, { status: 403 });
   }
 
@@ -46,6 +59,15 @@ export async function POST(
   try {
     await followPlaylist(user.id, playlist.circleId, playlist.spotifyPlaylistId);
   } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     if (err instanceof TokenInvalidError) {
       return NextResponse.json(
         { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
@@ -80,6 +102,15 @@ export async function POST(
         name: newName,
       });
     } catch (err) {
+      if (err instanceof SpotifyRateLimitError) {
+        return NextResponse.json(
+          {
+            error: 'Spotify is a bit busy right now. Please try again in a minute.',
+            rateLimited: true,
+          },
+          { status: 429 }
+        );
+      }
       if (err instanceof TokenInvalidError) {
         return NextResponse.json(
           { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },

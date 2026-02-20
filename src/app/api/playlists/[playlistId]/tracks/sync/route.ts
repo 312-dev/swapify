@@ -3,7 +3,12 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers, playlistTracks } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { getPlaylistItems, getPlaylistDetails, TokenInvalidError } from '@/lib/spotify';
+import {
+  getPlaylistItems,
+  getPlaylistDetails,
+  TokenInvalidError,
+  SpotifyRateLimitError,
+} from '@/lib/spotify';
 import { generateId } from '@/lib/utils';
 
 // POST /api/playlists/[playlistId]/tracks/sync — sync playlist items from Spotify
@@ -38,6 +43,15 @@ export async function POST(
       getPlaylistItems(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
     ]);
   } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
     if (err instanceof TokenInvalidError) {
       return NextResponse.json(
         { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },

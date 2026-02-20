@@ -1,7 +1,5 @@
-import { requireVerifiedEmail } from '@/lib/auth';
-import ActivityClient from './ActivityClient';
+import { redirect } from 'next/navigation';
 
-export default async function ActivityPage() {
-  await requireVerifiedEmail();
-  return <ActivityClient />;
+export default function ActivityPage() {
+  redirect('/dashboard');
 }

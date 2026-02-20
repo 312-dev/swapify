@@ -90,7 +90,7 @@ export default function ActivityClient() {
   const grouped = groupByDate(events);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen gradient-bg">
       <motion.div
         className="px-5 pt-8 pb-4"
         initial={{ opacity: 0, y: 8 }}

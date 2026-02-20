@@ -50,6 +50,9 @@ next-env.d.ts
 # local database
 /data/
 
+# spotify request log (dev only)
+spotify-requests.log
+
 # color palette previews
 /color-previews/
 

@@ -1,5 +1,12 @@
 echo "Running pre-push checks..."
 
+echo "Validating migrations..."
+npm run db:validate
+if [ $? -ne 0 ]; then
+  echo "Migration validation failed. Fix migration files before pushing."
+  exit 1
+fi
+
 echo "Type checking..."
 npm run type-check
 if [ $? -ne 0 ]; then

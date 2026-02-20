@@ -70,6 +70,7 @@ describe('parseNotificationPrefs', () => {
   it('handles full override of all types', () => {
     const full: NotificationPrefs = {
       newTrack: { push: false, email: false },
+      newSwaplist: { push: false, email: false },
       memberJoined: { push: false, email: false },
       reactions: { push: false, email: false },
       trackRemoved: { push: true, email: false },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, getSession } from '@/lib/auth';
-import { startPlayback } from '@/lib/spotify';
+import { startPlayback, SpotifyRateLimitError } from '@/lib/spotify';
 
 export async function PUT(request: NextRequest) {
   const user = await requireAuth();
@@ -16,7 +16,21 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'trackUri is required' }, { status: 400 });
   }
 
-  const res = await startPlayback(user.id, circleId, { contextUri, trackUri });
+  let res: Response;
+  try {
+    res = await startPlayback(user.id, circleId, { contextUri, trackUri });
+  } catch (err) {
+    if (err instanceof SpotifyRateLimitError) {
+      return NextResponse.json(
+        {
+          error: 'Spotify is a bit busy right now. Please try again in a minute.',
+          rateLimited: true,
+        },
+        { status: 429 }
+      );
+    }
+    throw err;
+  }
 
   if (res.status === 204 || res.ok) {
     return NextResponse.json({ ok: true });
