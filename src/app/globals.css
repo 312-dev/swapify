@@ -101,6 +101,7 @@
 html {
   scroll-behavior: smooth;
   overscroll-behavior: none;
+  overflow-x: clip;
 }
 
 body {
@@ -498,15 +499,44 @@ body {
   animation: reaction-pulse 2s ease-in-out infinite;
 }
 
-/* Landing page hero glow */
+/* Landing page hero glow — boosted for vibrancy */
 .landing-glow {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(56, 189, 248, 0.15) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(74, 222, 128, 0.12) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 40% at 50% 80%, rgba(56, 189, 248, 0.08) 0%, transparent 70%);
+    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(56, 189, 248, 0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(74, 222, 128, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 50% 80%, rgba(56, 189, 248, 0.12) 0%, transparent 70%);
   pointer-events: none;
+}
+
+/* CTA button shimmer sweep */
+@keyframes btn-shimmer-sweep {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  animation: btn-shimmer-sweep 3.5s ease-in-out 2s infinite;
+}
+
+/* Gradient text utility */
+.text-gradient-brand {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--accent-green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 @layer base {

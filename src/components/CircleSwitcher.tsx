@@ -203,7 +203,7 @@ export default function CircleSwitcher({
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.15, delay: STAGGER_DELAY * index }}
                 className={`w-full glass rounded-xl p-4 flex items-center gap-3 ${
-                  isActive ? 'ring-1 ring-brand/40 glow-brand' : ''
+                  isActive ? 'ring-1 ring-brand/50' : ''
                 }`}
               >
                 <button

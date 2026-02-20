@@ -69,9 +69,19 @@ export const spotifyConfig = {
     return isSpotifyDevMode() ? 10 : 4;
   },
 
-  /** How often to run token keepalive sweep (in poll cycles) */
+  /** How often to run token keepalive sweep (in poll cycles).
+   *  Dev mode: every 60 cycles (= ~60 min at 60s interval) — very conservative
+   *  to avoid hitting undocumented accounts.spotify.com rate limits.
+   *  Production: every 20 cycles (= ~10 min at 30s interval). */
   get tokenKeepaliveEveryNCycles() {
-    return isSpotifyDevMode() ? 20 : 10;
+    return isSpotifyDevMode() ? 60 : 20;
+  },
+  /**
+   * Minimum interval between Spotify description updates for vibe sync.
+   * Dev mode: 10 minutes (conserve budget). Production: 5 minutes.
+   */
+  get vibeDescSyncMinIntervalMs() {
+    return isSpotifyDevMode() ? 10 * 60_000 : 5 * 60_000;
   },
 } as const;
 

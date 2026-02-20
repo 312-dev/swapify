@@ -298,7 +298,7 @@ export default function AddMemberWizard({
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="friend@example.com"
+                      placeholder="friend's Spotify email"
                       className="input-glass flex-1"
                       autoComplete="email"
                       enterKeyHint="send"
@@ -313,6 +313,9 @@ export default function AddMemberWizard({
                       {isSending ? 'Sending...' : 'Send'}
                     </button>
                   </div>
+                  <p className="text-xs text-text-tertiary">
+                    Must be the email linked to their Spotify account
+                  </p>
                 </div>
 
                 {/* Navigation */}

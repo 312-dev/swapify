@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com https://wrapped-images.spotifycdn.com blob:",
+              "img-src 'self' data: https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com https://wrapped-images.spotifycdn.com https://images.unsplash.com blob:",
               "connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com https://image-cdn-fa.spotifycdn.com https://wrapped-images.spotifycdn.com",
               "font-src 'self'",
               "frame-ancestors 'none'",

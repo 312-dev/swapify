@@ -65,3 +65,41 @@ export function useAlbumColors(imageUrl: string | null): AlbumColorStyle {
   // Derive empty when no URL (avoids setState-in-effect for reset)
   return imageUrl ? result : EMPTY;
 }
+
+export interface CardTint {
+  /** Subtle left-edge gradient for row background */
+  background: string;
+  /** Accent color for the vibe text */
+  vibeColor: string;
+}
+
+const EMPTY_TINT: CardTint = { background: '', vibeColor: '' };
+
+/**
+ * Lightweight hook that extracts a subtle tint from a playlist/album image
+ * for use in list cards. Returns a gentle left-edge gradient and accent color.
+ */
+export function useCardTint(imageUrl: string | null): CardTint {
+  const [tint, setTint] = useState<CardTint>(EMPTY_TINT);
+
+  useEffect(() => {
+    if (!imageUrl) return;
+    let cancelled = false;
+
+    extractColors(imageUrl).then((colors) => {
+      if (cancelled || !colors) return;
+
+      const [r, g, b] = colors.primary;
+      setTint({
+        background: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.12) 0%, transparent 60%)`,
+        vibeColor: `rgba(${r}, ${g}, ${b}, 0.85)`,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
+
+  return imageUrl ? tint : EMPTY_TINT;
+}

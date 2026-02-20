@@ -1048,6 +1048,11 @@ async function refreshStaleTokens(): Promise<number> {
     ),
   });
 
+  if (staleMembers.length === 0) return 0;
+
+  // Stagger refreshes to avoid bursting the accounts.spotify.com token endpoint.
+  // Dev apps have tighter (undocumented) rate limits, so use longer delays.
+  const delayMs = spotifyConfig.devMode ? 3000 : 1000;
   let refreshed = 0;
 
   for (const member of staleMembers) {
@@ -1088,6 +1093,11 @@ async function refreshStaleTokens(): Promise<number> {
         { error, userId: member.userId, circleId: member.circleId },
         '[Swapify] Token keepalive refresh error'
       );
+    }
+
+    // Stagger calls to avoid hitting Spotify's token endpoint rate limits
+    if (refreshed < staleMembers.length) {
+      await new Promise((r) => setTimeout(r, delayMs));
     }
   }
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
 import Link from 'next/link';
 import AlbumArt from '@/components/AlbumArt';
 import { useUnreadActivity } from '@/components/UnreadActivityProvider';
+import { ActivityIcon, type ActivityIconHandle } from '@/components/ui/activity';
 
 interface ActivityEvent {
   id: string;
@@ -63,6 +64,7 @@ export default function ActivityClient() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const { markRead } = useUnreadActivity();
+  const activityIconRef = useRef<ActivityIconHandle>(null);
 
   useEffect(() => {
     fetch('/api/activity')
@@ -75,14 +77,29 @@ export default function ActivityClient() {
     markRead();
   }, [markRead]);
 
+  useEffect(() => {
+    if (!loading && events.length === 0) {
+      // Delay so the parent fade-in (0.1s + spring) completes before the draw animation plays
+      const timer = setTimeout(() => {
+        activityIconRef.current?.startAnimation();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, events.length]);
+
   const grouped = groupByDate(events);
 
   return (
     <div className="min-h-screen">
-      <div className="px-5 pt-8 pb-4">
+      <motion.div
+        className="px-5 pt-8 pb-4"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...springs.gentle, delay: 0.05 }}
+      >
         <h1 className="text-3xl font-bold text-text-primary">Activity</h1>
         <p className="text-base text-text-secondary mt-1">Recent updates across your Swaplists</p>
-      </div>
+      </motion.div>
 
       {loading ? (
         <div className="px-5 space-y-3 loading-delayed">
@@ -97,23 +114,29 @@ export default function ActivityClient() {
           ))}
         </div>
       ) : events.length === 0 ? (
-        <div className="text-center py-16 px-6">
-          <svg
-            className="w-16 h-16 text-text-tertiary mx-auto mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
+        <motion.div
+          className="text-center py-16 px-6"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: 0.1 }}
+        >
+          <ActivityIcon
+            ref={activityIconRef}
+            size={64}
+            className="text-text-tertiary w-fit mx-auto mb-4"
+          />
           <h2 className="text-xl font-semibold text-text-primary">No activity yet</h2>
           <p className="text-base text-text-secondary mt-2">
             Activity from your Swaplists will show up here.
           </p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="px-4">
+        <motion.div
+          className="px-4"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: 0.1 }}
+        >
           {grouped.map((group) => (
             <div key={group.label} className="mb-6">
               <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider px-1 mb-2">
@@ -171,7 +194,7 @@ export default function ActivityClient() {
               </div>
             </div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

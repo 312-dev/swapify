@@ -71,7 +71,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed left-0 right-0 z-50 bg-black/80 backdrop-blur-xl bottom-0 border-t border-white/[0.08] pb-[env(safe-area-inset-bottom)] sm:top-0 sm:bottom-auto sm:border-t-0 sm:border-b sm:border-white/[0.08] sm:pb-0"
+      className="fixed left-0 w-screen z-50 bg-black/80 backdrop-blur-xl bottom-0 border-t border-white/[0.08] pb-[env(safe-area-inset-bottom)] sm:top-0 sm:bottom-auto sm:border-t-0 sm:border-b sm:border-white/[0.08] sm:pb-0"
       data-tour="bottom-nav"
     >
       <div className="flex items-center justify-around h-16 max-w-2xl mx-auto w-full sm:justify-center sm:gap-2">
@@ -87,19 +87,21 @@ export default function BottomNav() {
               }`}
             >
               <motion.span
-                className="relative"
+                className="flex flex-col items-center sm:flex-row sm:gap-2"
                 style={{ willChange: 'transform' }}
                 whileTap={{ scale: 0.82 }}
                 transition={springs.snappy}
               >
-                <Icon />
-                {showBadge && (
-                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white leading-none">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
+                <span className="relative">
+                  <Icon />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white leading-none">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs font-medium mt-1 sm:mt-0 sm:text-sm">{label}</span>
               </motion.span>
-              <span className="text-xs font-medium mt-1 sm:mt-0 sm:text-sm">{label}</span>
             </Link>
           );
         })}

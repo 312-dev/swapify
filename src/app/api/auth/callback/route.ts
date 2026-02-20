@@ -117,7 +117,7 @@ async function handleCreateCircle(
     spotifyClientId,
     hostUserId: userId,
     inviteCode: generateInviteCode(),
-    maxMembers: spotifyConfig.devMode ? 5 : 25,
+    maxMembers: spotifyConfig.devMode ? 5 : 6,
   });
 
   await db.insert(circleMembers).values({

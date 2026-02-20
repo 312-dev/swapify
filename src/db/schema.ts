@@ -43,7 +43,7 @@ export const circles = pgTable(
       .notNull()
       .references(() => users.id),
     inviteCode: text('invite_code').notNull().unique(),
-    maxMembers: integer('max_members').notNull().default(5),
+    maxMembers: integer('max_members').notNull().default(6),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('circles_host_user_idx').on(table.hostUserId)]
@@ -93,6 +93,7 @@ export const playlists = pgTable('playlists', {
   removalDelay: text('removal_delay').notNull().default('immediate'),
   sortMode: text('sort_mode').notNull().default('order_added'),
   vibeName: text('vibe_name'),
+  vibeDescriptionSyncedAt: timestamp('vibe_description_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

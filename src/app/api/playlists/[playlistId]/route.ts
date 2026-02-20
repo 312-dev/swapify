@@ -10,6 +10,7 @@ import {
   TokenInvalidError,
 } from '@/lib/spotify';
 import { VALID_REMOVAL_DELAYS, SORT_MODES, type SortMode } from '@/lib/utils';
+import { buildSpotifyDescription } from '@/lib/vibe-name';
 
 // GET /api/playlists/[playlistId] — playlist detail
 export async function GET(
@@ -122,10 +123,13 @@ export async function PATCH(
     updates.sortMode = sortMode;
   }
 
-  // Update Spotify playlist details
+  // Update Spotify playlist details (compose description with vibe suffix)
   const spotifyUpdates: { name?: string; description?: string } = {};
   if (name) spotifyUpdates.name = name;
-  if (description !== undefined) spotifyUpdates.description = description;
+  if (description !== undefined) {
+    // Compose the Spotify description: user text + vibe label suffix
+    spotifyUpdates.description = buildSpotifyDescription(description, playlist.vibeName);
+  }
 
   try {
     if (Object.keys(spotifyUpdates).length > 0) {

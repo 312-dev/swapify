@@ -6,6 +6,21 @@ import { m } from 'motion/react';
 import { toast } from 'sonner';
 import { subscribeToPush } from '@/lib/push-client';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
+import { useAlbumColors } from '@/hooks/useAlbumColors';
+import { darken, rgbaCss } from '@/lib/color-extract';
+import {
+  Bell,
+  Mail,
+  LogOut,
+  Music,
+  Users,
+  Heart,
+  UserPlus,
+  Disc3,
+  Star,
+  RotateCcw,
+  Wand2,
+} from 'lucide-react';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_TYPE_LABELS,
@@ -91,6 +106,16 @@ async function resetNotificationPrefs(): Promise<boolean> {
   }
 }
 
+/** Map notification types to distinctive icons */
+const NOTIFICATION_ICONS: Record<NotificationType, typeof Music> = {
+  newTrack: Music,
+  memberJoined: UserPlus,
+  reactions: Heart,
+  trackRemoved: Disc3,
+  circleJoined: Users,
+  playlistFollowed: Star,
+};
+
 function ProfileContent({ user, stats }: ProfileClientProps) {
   const searchParams = useSearchParams();
 
@@ -116,7 +141,6 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
     }
     const perm = Notification.permission;
     setBrowserPushState(perm);
-    // If DB says push is on but browser hasn't granted permission, show as off
     if (perm !== 'granted' && pushMaster) {
       setPushMaster(false);
     }
@@ -271,29 +295,60 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
     }
   }
 
+  const avatarColors = useAlbumColors(user.avatarUrl);
+
+  // Build page-level gradient from profile photo colors
+  const pageGradient =
+    avatarColors.isExtracted && avatarColors.colors
+      ? (() => {
+          const { primary, secondary } = avatarColors.colors;
+          const dp = darken(primary, 0.5);
+          const ds = darken(secondary, 0.35);
+          return [
+            `radial-gradient(ellipse 130% 50% at 50% 0%, ${rgbaCss(dp, 0.95)} 0%, transparent 70%)`,
+            `radial-gradient(ellipse 90% 40% at 85% 5%, ${rgbaCss(ds, 0.6)} 0%, transparent 60%)`,
+            `radial-gradient(ellipse 70% 30% at 15% 10%, ${rgbaCss(primary, 0.2)} 0%, transparent 50%)`,
+          ].join(', ');
+        })()
+      : null;
+
   return (
-    <div className="min-h-screen gradient-bg">
-      {/* Header */}
-      <div className="gradient-bg-radial px-5 pt-10 pb-8 flex flex-col items-center text-center">
+    <div className={`min-h-screen relative ${pageGradient ? '' : 'gradient-bg'}`}>
+      {/* Full-bleed page gradient from profile photo */}
+      {pageGradient && (
+        <div
+          className="absolute top-0 sm:-top-20 bottom-0 left-1/2 w-screen -translate-x-1/2 pointer-events-none z-0"
+          aria-hidden="true"
+          style={{ backgroundImage: pageGradient }}
+        />
+      )}
+
+      {/* ── Hero header ── */}
+      <div className="relative z-1 px-5 pt-8 pb-7 flex flex-col items-center text-center">
+        {/* Avatar with gradient ring */}
         <m.div
+          className="relative z-10"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ ...springs.gentle, delay: 0.05 }}
         >
+          <div className="absolute -inset-[3px] rounded-full bg-gradient-to-br from-brand via-accent-green/50 to-brand opacity-80" />
           {user.avatarUrl ? (
             <img
               src={user.avatarUrl}
               alt={user.displayName}
-              className="w-24 h-24 rounded-full mb-4 shadow-xl glow-brand"
+              className="relative w-20 h-20 rounded-full ring-2 ring-background object-cover"
             />
           ) : (
-            <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-3xl font-bold text-text-secondary mb-4 glow-brand">
+            <div className="relative w-20 h-20 rounded-full ring-2 ring-background bg-surface flex items-center justify-center text-2xl font-bold text-text-secondary">
               {user.displayName[0]}
             </div>
           )}
         </m.div>
+
+        {/* Display name */}
         <m.h1
-          className="text-3xl font-bold text-text-primary"
+          className="relative z-10 mt-3.5 text-2xl font-display font-semibold text-text-primary tracking-tight"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springs.gentle, delay: 0.1 }}
@@ -301,60 +356,76 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
           {user.displayName}
         </m.h1>
 
-        {/* Stats */}
+        {/* Stats row */}
         <m.div
-          className="flex items-center gap-6 mt-4"
+          className="relative z-10 flex items-center gap-5 mt-3.5"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springs.gentle, delay: 0.15 }}
         >
-          <div className="text-center">
-            <p className="text-xl font-bold text-text-primary">{stats.jamCount}</p>
-            <p className="text-sm text-text-secondary">Swaplists</p>
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-1.5 text-brand">
+              <Disc3 className="w-3.5 h-3.5" />
+              <span className="text-xl font-heading font-bold tabular-nums">{stats.jamCount}</span>
+            </div>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
+              Swaplists
+            </span>
           </div>
-          <div className="w-px h-8 bg-white/10" />
-          <div className="text-center">
-            <p className="text-xl font-bold text-text-primary">{stats.trackCount}</p>
-            <p className="text-sm text-text-secondary">Tracks Added</p>
+
+          <div className="w-px h-8 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-1.5 text-accent-green">
+              <Music className="w-3.5 h-3.5" />
+              <span className="text-xl font-heading font-bold tabular-nums">
+                {stats.trackCount}
+              </span>
+            </div>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
+              Tracks Added
+            </span>
           </div>
         </m.div>
       </div>
 
-      {/* Settings sections */}
-      <div className="px-5 py-6 space-y-4">
-        {/* Notification Channels */}
+      {/* ── Settings sections ── */}
+      <div className="relative z-1 px-5 py-4 space-y-4">
+        {/* Notifications */}
         <m.div
-          className="glass rounded-2xl p-5"
-          initial={{ opacity: 0, y: 12 }}
+          className="glass rounded-2xl overflow-hidden"
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springs.gentle, delay: STAGGER_DELAY * 8 }}
         >
-          <h3 className="text-base font-semibold text-text-primary uppercase tracking-wider mb-4">
-            Notification Channels
-          </h3>
-          <div className="space-y-4">
+          <SectionHeader label="Notifications" />
+          <div className="px-4 pb-4 space-y-3">
             <div>
               <ToggleRow
+                icon={<Bell className="w-[18px] h-[18px] text-brand" />}
                 label="Push notifications"
                 description="Browser & mobile push alerts"
                 enabled={pushMaster}
                 onChange={handlePushMasterToggle}
               />
               {browserPushState === 'denied' && (
-                <p className="text-xs text-amber-400 mt-1.5 ml-0.5">
+                <p className="text-xs text-amber-400 mt-1.5 ml-9">
                   Notifications are blocked in your browser. Enable them in your browser/OS settings
                   to use push.
                 </p>
               )}
               {browserPushState === 'unsupported' && (
-                <p className="text-xs text-text-tertiary mt-1.5 ml-0.5">
+                <p className="text-xs text-text-tertiary mt-1.5 ml-9">
                   Push notifications are not supported in this browser.
                 </p>
               )}
             </div>
 
+            <div className="h-px bg-white/[0.04]" />
+
             <div>
               <ToggleRow
+                icon={<Mail className="w-[18px] h-[18px] text-brand" />}
                 label="Email notifications"
                 description="Email updates about your Swaplists"
                 enabled={emailMaster}
@@ -362,14 +433,14 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
               />
 
               {/* Email address management */}
-              <div className="mt-3 ml-0.5 space-y-2">
+              <div className="mt-3 ml-9 space-y-2">
                 {message && (
                   <div
-                    className={
+                    className={`rounded-xl px-3 py-2 text-sm ${
                       message.type === 'success'
-                        ? 'bg-brand/10 border border-brand/20 rounded-lg px-3 py-2 text-sm text-brand'
-                        : 'bg-danger/10 border border-danger/20 rounded-lg px-3 py-2 text-sm text-danger'
-                    }
+                        ? 'bg-accent-green/10 border border-accent-green/20 text-accent-green'
+                        : 'bg-danger/10 border border-danger/20 text-danger'
+                    }`}
                   >
                     {message.text}
                   </div>
@@ -384,7 +455,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                         setEmailInput('');
                         setMessage(null);
                       }}
-                      className="text-brand hover:underline"
+                      className="text-brand hover:text-brand-hover transition-colors"
                     >
                       Change
                     </button>
@@ -394,20 +465,22 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                 {user.pendingEmail && !isEditing && (
                   <div className="flex items-center gap-2 text-sm flex-wrap">
                     <span className="text-amber-400">{user.pendingEmail}</span>
-                    <span className="text-text-tertiary">·</span>
-                    <span className="text-text-tertiary">Verifying</span>
-                    <span className="text-text-tertiary">·</span>
+                    <span className="text-text-tertiary">&middot;</span>
+                    <span className="text-text-tertiary text-xs uppercase tracking-wide">
+                      Verifying
+                    </span>
+                    <span className="text-text-tertiary">&middot;</span>
                     <button
                       onClick={handleResend}
                       disabled={isSaving}
-                      className="text-brand hover:underline"
+                      className="text-brand hover:text-brand-hover transition-colors"
                     >
                       Resend
                     </button>
                     <button
                       onClick={handleCancel}
                       disabled={isSaving}
-                      className="text-text-tertiary hover:text-danger hover:underline"
+                      className="text-text-tertiary hover:text-danger transition-colors"
                     >
                       Cancel
                     </button>
@@ -420,8 +493,9 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                       setIsEditing(true);
                       setMessage(null);
                     }}
-                    className="text-sm text-brand hover:underline"
+                    className="text-sm text-brand hover:text-brand-hover transition-colors flex items-center gap-1.5"
                   >
+                    <Plus className="w-3.5 h-3.5" />
                     Add email address
                   </button>
                 )}
@@ -452,7 +526,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                         setIsEditing(false);
                         setMessage(null);
                       }}
-                      className="text-sm text-text-tertiary hover:text-text-primary"
+                      className="text-sm text-text-tertiary hover:text-text-primary transition-colors"
                     >
                       Cancel
                     </button>
@@ -460,113 +534,148 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                 )}
               </div>
             </div>
-          </div>
-        </m.div>
-
-        {/* Notification Types */}
-        <m.div
-          className="glass rounded-2xl p-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...springs.gentle, delay: STAGGER_DELAY * 12 }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-text-primary uppercase tracking-wider">
-              Notification Types
-            </h3>
-            <button
-              onClick={handleReset}
-              className="text-sm text-text-tertiary hover:text-text-secondary transition-colors"
-            >
-              Reset defaults
-            </button>
-          </div>
-
-          {/* Column headers */}
-          <div className="flex items-center justify-end gap-3 mb-3 pr-0.5">
-            <span className="text-sm text-text-tertiary w-10 text-center">Push</span>
-            <span className="text-sm text-text-tertiary w-10 text-center">Email</span>
-          </div>
-
-          <div className="space-y-3">
-            {NOTIFICATION_TYPES.map((type) => (
-              <div key={type} className="flex items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary">
-                    {NOTIFICATION_TYPE_LABELS[type].label}
-                  </p>
-                  <p className="text-sm text-text-tertiary">
-                    {NOTIFICATION_TYPE_LABELS[type].description}
-                  </p>
-                </div>
-                <div className="flex gap-3 shrink-0">
-                  <MiniToggle
-                    enabled={prefs[type].push}
-                    disabled={!pushMaster}
-                    onChange={(v) => handleTypePrefToggle(type, 'push', v)}
-                    label={`${NOTIFICATION_TYPE_LABELS[type].label} push`}
-                  />
-                  <MiniToggle
-                    enabled={prefs[type].email}
-                    disabled={!emailMaster}
-                    onChange={(v) => handleTypePrefToggle(type, 'email', v)}
-                    label={`${NOTIFICATION_TYPE_LABELS[type].label} email`}
-                  />
-                </div>
+            {/* Per-type toggles */}
+            <div className="pt-1">
+              <div className="flex items-center gap-3 my-3">
+                <div className="h-px flex-1 bg-white/[0.06]" />
+                <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
+                  By type
+                </span>
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  Reset
+                </button>
+                <div className="h-px flex-1 bg-white/[0.06]" />
               </div>
-            ))}
+
+              {/* Column headers */}
+              <div className="flex items-center justify-end gap-3 mb-2 pr-0.5">
+                <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary w-10 text-center">
+                  Push
+                </span>
+                <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary w-10 text-center">
+                  Email
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                {NOTIFICATION_TYPES.map((type, i) => {
+                  const Icon = NOTIFICATION_ICONS[type];
+                  return (
+                    <m.div
+                      key={type}
+                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 -mx-3 hover:bg-white/[0.02] transition-colors"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ ...springs.gentle, delay: STAGGER_DELAY * 10 + i * 0.04 }}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+                          <Icon className="w-4 h-4 text-text-secondary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary">
+                            {NOTIFICATION_TYPE_LABELS[type].label}
+                          </p>
+                          <p className="text-xs text-text-tertiary truncate">
+                            {NOTIFICATION_TYPE_LABELS[type].description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 shrink-0">
+                        <MiniToggle
+                          enabled={prefs[type].push}
+                          disabled={!pushMaster}
+                          onChange={(v) => handleTypePrefToggle(type, 'push', v)}
+                          label={`${NOTIFICATION_TYPE_LABELS[type].label} push`}
+                        />
+                        <MiniToggle
+                          enabled={prefs[type].email}
+                          disabled={!emailMaster}
+                          onChange={(v) => handleTypePrefToggle(type, 'email', v)}
+                          label={`${NOTIFICATION_TYPE_LABELS[type].label} email`}
+                        />
+                      </div>
+                    </m.div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </m.div>
 
         {/* Listening */}
         <m.div
-          className="glass rounded-2xl p-5"
-          initial={{ opacity: 0, y: 12 }}
+          className="glass rounded-2xl overflow-hidden"
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springs.gentle, delay: STAGGER_DELAY * 16 }}
         >
-          <h3 className="text-base font-semibold text-text-primary uppercase tracking-wider mb-4">
-            Listening
-          </h3>
-          <ToggleRow
-            label="Auto-reactions"
-            description="Automatically react based on behavior (skip = thumbs down, save to library = thumbs up)"
-            enabled={user.autoNegativeReactions}
-            onChange={(v) => updatePreference('autoNegativeReactions', v)}
-          />
+          <SectionHeader label="Listening" />
+          <div className="px-4 pb-4">
+            <ToggleRow
+              icon={<Wand2 className="w-[18px] h-[18px] text-accent-green" />}
+              label="Auto-reactions"
+              description="Skip = thumbs down, save to library = thumbs up"
+              enabled={user.autoNegativeReactions}
+              onChange={(v) => updatePreference('autoNegativeReactions', v)}
+            />
+          </div>
         </m.div>
 
         {/* Logout */}
         <m.form
           action="/api/auth/logout"
           method="POST"
-          className="pt-4"
+          className="pt-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ ...springs.gentle, delay: STAGGER_DELAY * 20 }}
         >
           <button
             type="submit"
-            className="btn-pill w-full text-danger border border-danger/30 hover:bg-danger/10 transition-colors"
+            className="btn-pill w-full flex items-center justify-center gap-2 text-danger/80 border border-danger/20 hover:border-danger/40 hover:text-danger hover:bg-danger/[0.06] transition-all"
           >
+            <LogOut className="w-4 h-4" />
             Log out
           </button>
         </m.form>
 
-        <p className="text-center text-sm text-text-secondary pt-2">
-          Swapify · Built with Spotify Web API
-        </p>
+        {/* Footer */}
+        <m.p
+          className="text-center text-xs text-text-tertiary pt-3 pb-2 tracking-wide"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.6 }}
+          transition={{ ...springs.gentle, delay: STAGGER_DELAY * 22 }}
+        >
+          Swapify &middot; Built with Spotify Web API
+        </m.p>
       </div>
     </div>
   );
 }
 
+/* ─── Section header component ─── */
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <div className="px-4 pt-4 pb-3">
+      <h3 className="text-[13px] font-heading font-semibold text-text-primary/70">{label}</h3>
+    </div>
+  );
+}
+
+/* ─── Toggle row with icon ─── */
 function ToggleRow({
+  icon,
   label,
   description,
   enabled,
   onChange,
 }: {
+  icon?: React.ReactNode;
   label: string;
   description: string;
   enabled: boolean;
@@ -574,7 +683,6 @@ function ToggleRow({
 }) {
   const [isOn, setIsOn] = useState(enabled);
 
-  // Sync with parent state (e.g. when browser permission check overrides pushMaster)
   useEffect(() => {
     setIsOn(enabled);
   }, [enabled]);
@@ -593,22 +701,25 @@ function ToggleRow({
 
   return (
     <div className="flex items-center justify-between gap-4">
-      <div className="flex-1 min-w-0">
-        <p className="text-base font-medium text-text-primary">{label}</p>
-        <p className="text-sm text-text-secondary mt-0.5">{description}</p>
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-medium text-text-primary leading-tight">{label}</p>
+          <p className="text-sm text-text-tertiary mt-0.5 leading-snug">{description}</p>
+        </div>
       </div>
       <button
         role="switch"
         aria-checked={isOn}
         aria-label={label}
         onClick={handleClick}
-        className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${
-          isOn ? 'bg-brand' : 'bg-white/10'
+        className={`relative w-12 h-7 rounded-full transition-all duration-200 shrink-0 ${
+          isOn ? 'bg-brand shadow-[0_0_12px_rgba(56,189,248,0.25)]' : 'bg-white/10'
         }`}
       >
         <div
-          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-            isOn ? 'translate-x-[22px]' : 'translate-x-0.5'
+          className={`absolute top-[3px] w-[22px] h-[22px] rounded-full shadow-sm transition-all duration-200 ${
+            isOn ? 'translate-x-[23px] bg-white' : 'translate-x-[3px] bg-white/70'
           }`}
         />
       </button>
@@ -616,6 +727,7 @@ function ToggleRow({
   );
 }
 
+/* ─── Mini toggle for notification type grid ─── */
 function MiniToggle({
   enabled,
   disabled,
@@ -636,15 +748,37 @@ function MiniToggle({
       onClick={() => {
         if (!disabled) onChange(!enabled);
       }}
-      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-        disabled ? 'bg-white/5 cursor-not-allowed' : enabled ? 'bg-brand' : 'bg-white/10'
+      className={`relative w-10 h-[22px] rounded-full transition-all duration-200 ${
+        disabled
+          ? 'bg-white/5 cursor-not-allowed'
+          : enabled
+            ? 'bg-brand shadow-[0_0_8px_rgba(56,189,248,0.2)]'
+            : 'bg-white/10'
       }`}
     >
       <div
-        className={`absolute top-0.5 w-4 h-4 rounded-full shadow-sm transition-all duration-200 ${
-          disabled ? 'bg-white/20' : 'bg-white'
-        } ${enabled ? 'translate-x-[21px]' : 'translate-x-0.5'}`}
+        className={`absolute top-[3px] w-4 h-4 rounded-full shadow-sm transition-all duration-200 ${
+          disabled ? 'bg-white/20' : enabled ? 'bg-white' : 'bg-white/60'
+        } ${enabled ? 'translate-x-[21px]' : 'translate-x-[3px]'}`}
       />
     </button>
+  );
+}
+
+/* ─── Plus icon (small inline) ─── */
+function Plus({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { m } from 'motion/react';
+import { m, useInView } from 'motion/react';
 import { Globe, Mail, Plus, UserPlus } from 'lucide-react';
 import { AudioLinesIcon, type AudioLinesIconHandle } from '@/components/ui/audio-lines';
 import { FlameIcon, type FlameIconHandle } from '@/components/ui/flame';
@@ -48,7 +48,7 @@ function pickRandom<T>(arr: T[], count: number): T[] {
 
 const FADE_MS = 1200;
 const CLIP_DURATION_MS = 5000;
-const VIDEO_OPACITY = 0.45;
+const VIDEO_OPACITY = 0.55;
 
 /** Load a video, seek to a random point with at least `minRemaining` seconds left, and play. */
 function loadAtRandomTime(video: HTMLVideoElement, src: string, minRemaining: number) {
@@ -146,7 +146,7 @@ function PhoneMockup() {
   const albumColors = useAlbumColors(coverUrl);
 
   return (
-    <div className="relative mx-auto w-[272px] sm:w-[290px]">
+    <div className="relative mx-auto w-[220px] sm:w-[260px] lg:w-[290px]">
       {/* Frame */}
       <div className="rounded-[2.5rem] border-[3px] border-white/[0.12] bg-black p-3 shadow-2xl shadow-black/60">
         {/* Dynamic island */}
@@ -180,7 +180,6 @@ function PhoneMockup() {
 
           {/* Playlist header */}
           <div className="px-5 pt-2 pb-3 text-center">
-            {/* Cover — Unsplash sunset beach (royalty-free) */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/mockup/weekend-vibes.jpg"
@@ -379,8 +378,8 @@ function PhoneMockup() {
         </div>
       </div>
 
-      {/* Glow */}
-      <div className="absolute -inset-16 -z-10 bg-brand/8 rounded-full blur-3xl" />
+      {/* Glow — boosted */}
+      <div className="absolute -inset-16 -z-10 bg-brand/12 rounded-full blur-3xl" />
     </div>
   );
 }
@@ -398,67 +397,137 @@ function SpotifyIcon({ className = 'w-5 h-5' }: { className?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Data                                                               */
+/*  Feature card with scroll-triggered animation                       */
 /* ------------------------------------------------------------------ */
 
-const FEATURE_TITLES = ['Friends drop songs in', 'React to every pick', 'Queue clears itself'];
-const ICON_ANIM_DURATION_MS = 1200;
-const ICON_GAP_MS = 400;
-const SEQUENCE_PAUSE_MS = 3000;
+const FEATURES = [
+  {
+    image: '/images/landing/concert.jpg',
+    title: 'Friends drop songs in',
+    desc: 'Your crew adds tracks to a shared inbox. Everyone contributes, everyone discovers.',
+    iconType: 'audio' as const,
+  },
+  {
+    image: '/images/landing/friends.jpg',
+    title: 'React to every pick',
+    desc: 'Swipe to react, drop emoji, see what everyone thinks. Every track gets its moment.',
+    iconType: 'flame' as const,
+  },
+  {
+    image: '/images/landing/hero-dj.jpg',
+    title: 'Queue clears itself',
+    desc: 'Once everyone listens, tracks auto-archive. No stale playlists, always fresh.',
+    iconType: 'hand' as const,
+  },
+];
 
-/** Feature tags with icons that animate one at a time in sequence. */
-function FeatureTags() {
-  const iconRefs = [
-    useRef<AudioLinesIconHandle>(null),
-    useRef<FlameIconHandle>(null),
-    useRef<HandMetalIconHandle>(null),
-  ];
+function FeatureCard({
+  image,
+  title,
+  desc,
+  iconType,
+  index,
+}: {
+  image: string;
+  title: string;
+  desc: string;
+  iconType: 'audio' | 'flame' | 'hand';
+  index: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: '-60px' });
+  const iconRef = useRef<AudioLinesIconHandle | FlameIconHandle | HandMetalIconHandle>(null);
 
+  // Trigger icon animation when card comes into view
   useEffect(() => {
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
-
-    function runSequence() {
-      iconRefs.forEach((ref, i) => {
-        // Start each icon with a staggered delay
-        const startAt = i * (ICON_ANIM_DURATION_MS + ICON_GAP_MS);
-        timeouts.push(
-          setTimeout(() => ref.current?.startAnimation(), startAt),
-          setTimeout(() => ref.current?.stopAnimation(), startAt + ICON_ANIM_DURATION_MS)
-        );
-      });
-
-      // After the full sequence finishes, pause then repeat
-      const totalDuration = iconRefs.length * (ICON_ANIM_DURATION_MS + ICON_GAP_MS);
-      timeouts.push(setTimeout(runSequence, totalDuration + SEQUENCE_PAUSE_MS));
+    if (isInView) {
+      const timer = setTimeout(() => iconRef.current?.startAnimation(), 400 + index * 200);
+      return () => clearTimeout(timer);
     }
+  }, [isInView, index]);
 
-    // Initial kick-off after page load animations settle
-    timeouts.push(setTimeout(runSequence, 2200));
-
-    return () => timeouts.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const IconComponent =
+    iconType === 'audio' ? AudioLinesIcon : iconType === 'flame' ? FlameIcon : HandMetalIcon;
 
   return (
     <m.div
-      className="flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-3 mt-10"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 1.3, duration: 0.6 }}
+      ref={ref}
+      initial={{ opacity: 0, y: 50 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ ...springs.gentle, delay: index * 0.15 }}
+      className="rounded-2xl overflow-hidden glass group"
     >
-      <div className="flex items-center gap-2 text-base text-text-secondary">
-        <AudioLinesIcon ref={iconRefs[0]} size={16} className="text-brand" />
-        <span>{FEATURE_TITLES[0]}</span>
+      <div className="relative h-44 sm:h-52 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={image}
+          alt=""
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#0a0a0a]" />
       </div>
-      <div className="flex items-center gap-2 text-base text-text-secondary">
-        <FlameIcon ref={iconRefs[1]} size={16} className="text-brand" />
-        <span>{FEATURE_TITLES[1]}</span>
-      </div>
-      <div className="flex items-center gap-2 text-base text-text-secondary">
-        <HandMetalIcon ref={iconRefs[2]} size={16} className="text-brand" />
-        <span>{FEATURE_TITLES[2]}</span>
+      <div className="p-5 -mt-8 relative">
+        <div className="w-10 h-10 rounded-full bg-brand/15 border border-brand/20 flex items-center justify-center mb-3">
+          <IconComponent ref={iconRef} size={20} className="text-brand" />
+        </div>
+        <h3 className="font-heading text-xl font-bold text-white mb-2">{title}</h3>
+        <p className="text-sm text-white/50 leading-relaxed">{desc}</p>
       </div>
     </m.div>
+  );
+}
+
+function FeatureCards({ onGetStarted }: { onGetStarted: () => void }) {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: '-100px' });
+
+  return (
+    <section ref={sectionRef} className="relative px-5 py-20 sm:py-28">
+      {/* Subtle aurora background */}
+      <div className="absolute inset-0 aurora-accent opacity-50" />
+
+      <div className="relative max-w-5xl mx-auto">
+        {/* Section header */}
+        <m.div
+          className="text-center mb-12 sm:mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ ...springs.gentle }}
+        >
+          <h2 className="font-heading text-3xl sm:text-4xl font-bold text-white mb-3">
+            How it works
+          </h2>
+          <p className="text-white/40 text-lg max-w-md mx-auto">
+            Three steps to never-stale playlists
+          </p>
+        </m.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
+          {FEATURES.map((f, i) => (
+            <FeatureCard key={i} {...f} index={i} />
+          ))}
+        </div>
+
+        {/* Bottom CTA */}
+        <m.div
+          className="text-center mt-16 sm:mt-20"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ ...springs.gentle, delay: 0.6 }}
+        >
+          <p className="font-display text-2xl sm:text-3xl text-white/60 mb-6">
+            Your friends are waiting.
+          </p>
+          <button
+            onClick={onGetStarted}
+            className="btn-pill text-base sm:text-lg px-8 sm:px-10 py-3.5 sm:py-4 relative overflow-hidden bg-accent-green text-black hover:bg-accent-green/90 active:scale-[0.98] hover:scale-[1.02] transition-transform font-heading glow-green btn-shimmer"
+          >
+            <SpotifyIcon />
+            Get Started Free
+          </button>
+        </m.div>
+      </div>
+    </section>
   );
 }
 
@@ -488,7 +557,6 @@ export default function LandingClient() {
         throw new Error(data.error || 'Invalid invite code');
       }
       const data = await res.json();
-      // Route to the correct join page based on code type
       const trimmedCode = encodeURIComponent(joinCode.trim());
       if (data.type === 'circle') {
         window.location.href = `/circle/join?code=${trimmedCode}`;
@@ -513,7 +581,6 @@ export default function LandingClient() {
         throw new Error(data.error || 'No account found');
       }
       const data = await res.json();
-      // Redirect straight to Spotify login
       const params = new URLSearchParams({
         clientId: data.spotifyClientId,
         circleId: data.circleId,
@@ -529,204 +596,200 @@ export default function LandingClient() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden flex flex-col">
-      {/* ───────── Hero ───────── */}
-      <section className="relative flex-1 flex items-center overflow-clip">
-        {/* Background */}
-        <div className="absolute inset-0 gradient-bg-radial" />
+      {/* ───────── Hero — full viewport, content at bottom ───────── */}
+      <section className="relative min-h-dvh flex flex-col justify-end overflow-clip">
+        {/* Video background */}
+        <HeroVideoBackground />
+
+        {/* Overlay — lighter at top to let video breathe, darker at bottom for text */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#081420]/30 via-[#081420]/40 to-[#0a0a0a]/95" />
+
+        {/* Color glow layer */}
         <div className="landing-glow" />
 
-        {/* Video background — crossfades between 3 random clips */}
-        <HeroVideoBackground />
-        {/* Dark overlay for text contrast */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#081420]/70 via-[#081420]/50 to-[#0a0a0a]/90" />
+        {/* Content */}
+        <div className="relative z-10 w-full">
+          {/* Desktop: side-by-side layout */}
+          <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 pb-8 sm:pb-12">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+              {/* Phone — visible on all sizes */}
+              <div className="flex justify-center lg:order-2 lg:flex-shrink-0 mb-8 lg:mb-0">
+                <div className="relative">
+                  {/* Floating notification — one on mobile, all three on desktop */}
+                  <m.div
+                    className="absolute -top-3 -left-8 sm:-left-24 bg-[#141414] border border-white/10 rounded-xl px-3 py-2 sm:px-3.5 sm:py-2.5 -rotate-2 shadow-2xl shadow-black/70 z-30 flex items-center gap-2 sm:gap-2.5 ring-1 ring-black/50"
+                    initial={{ opacity: 0, scale: 0.8, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ ...springs.snappy, delay: 1.8 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/mockup/member-1.jpg"
+                      alt=""
+                      className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0"
+                    />
+                    <div>
+                      <p className="text-[11px] sm:text-xs font-medium text-text-primary">
+                        Sarah added a track
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] text-text-tertiary">
+                        Levitating &middot; Weekend Vibes
+                      </p>
+                    </div>
+                  </m.div>
 
-        {/* Soft ambient blurs */}
-        <div className="absolute top-[18%] left-[8%] w-32 h-32 rounded-full bg-brand/[0.04] blur-2xl" />
-        <div className="absolute bottom-[20%] right-[5%] w-48 h-48 rounded-full bg-accent-green/[0.03] blur-3xl" />
+                  {/* Desktop-only: second notification */}
+                  <m.div
+                    className="absolute -bottom-4 -right-16 bg-[#141414] border border-white/10 rounded-xl px-3.5 py-2.5 rotate-2 shadow-2xl shadow-black/70 z-30 hidden lg:flex items-center gap-2.5 ring-1 ring-black/50"
+                    initial={{ opacity: 0, scale: 0.8, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ ...springs.snappy, delay: 2.2 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/mockup/member-2.jpg"
+                      alt=""
+                      className="w-6 h-6 rounded-full object-cover shrink-0"
+                    />
+                    <div>
+                      <p className="text-xs font-medium text-text-primary">
+                        Mike reacted <span className="text-[10px]">🔥</span> to your song
+                      </p>
+                      <p className="text-[11px] text-text-tertiary">
+                        Blinding Lights &middot; just now
+                      </p>
+                    </div>
+                  </m.div>
 
-        <div className="relative z-10 max-w-6xl mx-auto w-full px-6 pt-16 sm:pt-14 pb-12 flex flex-col">
-          {/* Centered brand mark */}
-          <m.div
-            className="flex items-center justify-center gap-4 mb-12 lg:mb-14"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...springs.gentle, delay: 0.05 }}
-          >
-            {/* Share Song icon — Noun Project, Arctic Aurora brand color */}
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 512 512"
-              fill="currentColor"
-              className="shrink-0 text-brand drop-shadow-[0_0_14px_rgba(56,189,248,0.35)]"
-              aria-hidden="true"
-            >
-              <g transform="translate(0,512) scale(0.1,-0.1)">
-                <path d="M1483 5105 c-170 -46 -304 -181 -348 -350 -12 -47 -15 -123 -15 -372 l0 -313 -47 23 c-100 50 -152 62 -273 62 -94 0 -128 -4 -185 -23 -109 -36 -193 -88 -271 -167 -244 -247 -244 -643 1 -891 254 -257 657 -258 907 -1 l48 48 872 -386 873 -387 2 -111 c1 -62 3 -123 5 -137 3 -23 -51 -54 -802 -471 l-805 -447 -3 304 c-3 341 -1 351 64 400 l37 29 217 5 217 5 37 29 c71 54 85 151 32 221 -46 59 -72 65 -293 65 -217 0 -285 -11 -375 -56 -71 -36 -159 -123 -197 -193 -56 -106 -61 -143 -61 -488 l0 -313 -47 23 c-100 50 -152 62 -273 62 -94 0 -128 -4 -185 -23 -109 -36 -193 -88 -271 -167 -247 -249 -244 -645 6 -896 315 -316 845 -219 1032 190 39 85 58 189 58 324 l1 112 886 491 886 491 61 -49 c221 -179 520 -194 759 -39 117 77 203 189 255 333 l26 73 4 383 3 382 193 0 c258 0 332 22 455 136 113 104 169 270 144 419 -33 195 -192 359 -382 395 -80 15 -286 12 -359 -5 -175 -41 -311 -175 -357 -350 -12 -47 -15 -123 -15 -372 l0 -313 -42 21 c-213 109 -468 84 -665 -65 -35 -26 -73 -61 -87 -78 l-23 -30 -644 285 c-354 156 -749 331 -877 388 l-234 104 6 35 c3 19 6 187 6 373 l0 337 183 0 c200 0 271 11 359 56 65 33 164 132 200 200 145 271 -6 610 -307 689 -77 20 -318 20 -392 0z" />
-              </g>
-            </svg>
-            <span className="text-4xl sm:text-5xl font-display text-text-primary tracking-tight">
-              Swapify
-            </span>
-          </m.div>
+                  {/* Desktop-only: third notification */}
+                  <m.div
+                    className="absolute top-24 -right-10 bg-[#141414] border border-white/10 rounded-xl px-3.5 py-2.5 rotate-1 shadow-2xl shadow-black/70 z-30 hidden lg:flex items-center gap-2.5 ring-1 ring-black/50"
+                    initial={{ opacity: 0, scale: 0.8, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ ...springs.snappy, delay: 2.6 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/mockup/member-3.jpg"
+                      alt=""
+                      className="w-6 h-6 rounded-full object-cover shrink-0"
+                    />
+                    <div>
+                      <p className="text-xs font-medium text-text-primary">
+                        Jess joined your Swaplist
+                      </p>
+                      <p className="text-[11px] text-text-tertiary">
+                        Weekend Vibes &middot; 5m ago
+                      </p>
+                    </div>
+                  </m.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-12 items-center flex-1">
-            {/* Left — copy */}
-            <div className="text-center lg:text-left">
-              <h1 className="text-[2.75rem] sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[0.95]">
-                {[
-                  { text: 'A shared playlist', className: '' },
-                  { text: 'that clears as you listen', className: 'text-brand' },
-                ].map((line, i) => (
-                  <span key={i} className="block overflow-hidden py-[0.05em]">
-                    <m.span
-                      className={`block ${line.className}`}
-                      initial={{ y: '110%' }}
-                      animate={{ y: '0%' }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 70,
-                        damping: 18,
-                        delay: 0.3 + i * 0.25,
-                      }}
-                    >
-                      {line.text}
-                    </m.span>
-                  </span>
-                ))}
-              </h1>
+                  {/* Phone entrance — scale up + slight tilt on mobile */}
+                  <m.div
+                    initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ ...springs.gentle, delay: 0.4 }}
+                    className="-rotate-3 lg:rotate-0"
+                  >
+                    <PhoneMockup />
+                  </m.div>
+                </div>
+              </div>
 
-              <m.p
-                className="text-lg text-text-secondary max-w-md mx-auto lg:mx-0 mb-10"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ ...springs.gentle, delay: 0.9 }}
-              >
-                Think of it as a musical mailbox — friends fill it with songs, and listening empties
-                it.
-              </m.p>
-
-              <m.div
-                className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ ...springs.gentle, delay: 1.1 }}
-              >
-                <button
-                  onClick={() => setShowGetStarted(true)}
-                  className="btn-pill text-base px-8 py-3.5 inline-flex bg-accent-green text-black hover:bg-accent-green/90 active:scale-[0.98] hover:scale-[1.02] font-heading glow-green"
+              {/* Text content — anchored at bottom */}
+              <div className="text-center lg:text-left lg:order-1 lg:pb-4">
+                {/* Brand wordmark */}
+                <m.span
+                  className="font-display text-2xl sm:text-3xl text-gradient-brand tracking-[0.15em] uppercase block mb-5 lg:mb-6"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springs.gentle, delay: 0.1 }}
                 >
-                  <SpotifyIcon />
-                  Get Started
-                </button>
-                <button
-                  onClick={() => setShowSignIn(true)}
-                  className="btn-pill text-base px-8 py-3.5 inline-flex bg-white/10 text-white hover:bg-white/15 active:scale-[0.98] hover:scale-[1.02] font-heading border border-white/15"
+                  Swapify
+                </m.span>
+
+                {/* Headline — mixed typography */}
+                <h1 className="mb-5 sm:mb-6 leading-[0.92]">
+                  {[
+                    {
+                      text: 'A shared playlist',
+                      className:
+                        'font-heading text-[2.25rem] sm:text-5xl lg:text-6xl font-bold text-white',
+                    },
+                    {
+                      text: 'that clears as you listen',
+                      className:
+                        'font-display text-[2.25rem] sm:text-5xl lg:text-6xl text-brand mt-1',
+                    },
+                  ].map((line, i) => (
+                    <span key={i} className="block overflow-hidden py-[0.04em]">
+                      <m.span
+                        className={`block ${line.className}`}
+                        initial={{ y: '110%' }}
+                        animate={{ y: '0%' }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 70,
+                          damping: 18,
+                          delay: 0.2 + i * 0.15,
+                        }}
+                      >
+                        {line.text}
+                      </m.span>
+                    </span>
+                  ))}
+                </h1>
+
+                {/* Subtitle */}
+                <m.p
+                  className="text-lg sm:text-xl font-light text-white/55 max-w-sm mx-auto lg:mx-0 mb-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springs.gentle, delay: 0.6 }}
                 >
-                  Sign In
-                </button>
-              </m.div>
+                  Think of it as a musical mailbox &mdash; friends fill it with songs, and listening
+                  empties it.
+                </m.p>
 
-              {/* Feature tags — icons animate sequentially */}
-              <FeatureTags />
-
-              {/* Subtle "How it works" link */}
-              <m.div
-                className="mt-6 flex justify-center lg:justify-start"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.6, duration: 0.5 }}
-              >
-                <SpotifyChangesBanner />
-              </m.div>
-            </div>
-
-            {/* Right — phone + floating UI elements (hidden on mobile) */}
-            <div className="hidden lg:flex lg:justify-end">
-              <div className="relative">
-                {/* Floating notification — "Sarah added a track" */}
+                {/* CTAs — big green pill + text sign in */}
                 <m.div
-                  className="absolute -top-4 -left-28 bg-[#141414] border border-white/10 rounded-xl px-3.5 py-2.5 -rotate-2 shadow-2xl shadow-black/70 z-30 hidden sm:flex items-center gap-2.5 ring-1 ring-black/50"
-                  initial={{ opacity: 0, scale: 0.8, y: 8 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ ...springs.snappy, delay: 2 }}
+                  className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5 justify-center lg:justify-start"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springs.gentle, delay: 0.8 }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/images/mockup/member-1.jpg"
-                    alt=""
-                    className="w-6 h-6 rounded-full object-cover shrink-0"
-                  />
-                  <div>
-                    <p className="text-xs font-medium text-text-primary">Sarah added a track</p>
-                    <p className="text-[11px] text-text-tertiary">
-                      Levitating &middot; Weekend Vibes
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => setShowGetStarted(true)}
+                    className="btn-pill text-base sm:text-lg px-8 sm:px-10 py-3.5 sm:py-4 relative overflow-hidden bg-accent-green text-black hover:bg-accent-green/90 active:scale-[0.98] hover:scale-[1.02] transition-transform font-heading glow-green btn-shimmer"
+                  >
+                    <SpotifyIcon />
+                    Get Started
+                  </button>
+                  <button
+                    onClick={() => setShowSignIn(true)}
+                    className="text-white/50 hover:text-white/80 underline underline-offset-4 decoration-white/20 hover:decoration-white/40 transition-all text-base font-medium"
+                  >
+                    Sign In
+                  </button>
                 </m.div>
 
-                {/* Floating notification — "Mike reacted 🔥 to your song" */}
+                {/* How it works link */}
                 <m.div
-                  className="absolute -bottom-6 -right-20 bg-[#141414] border border-white/10 rounded-xl px-3.5 py-2.5 rotate-2 shadow-2xl shadow-black/70 z-30 hidden sm:flex items-center gap-2.5 ring-1 ring-black/50"
-                  initial={{ opacity: 0, scale: 0.8, y: 8 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ ...springs.snappy, delay: 2.4 }}
+                  className="mt-6 flex justify-center lg:justify-start"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.2, duration: 0.5 }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/images/mockup/member-2.jpg"
-                    alt=""
-                    className="w-6 h-6 rounded-full object-cover shrink-0"
-                  />
-                  <div>
-                    <p className="text-xs font-medium text-text-primary">
-                      Mike reacted <span className="text-[10px]">🔥</span> to your song
-                    </p>
-                    <p className="text-[11px] text-text-tertiary">
-                      Blinding Lights &middot; just now
-                    </p>
-                  </div>
-                </m.div>
-
-                {/* Floating notification — "Jess joined your Swaplist" */}
-                <m.div
-                  className="absolute top-20 -right-12 bg-[#141414] border border-white/10 rounded-xl px-3.5 py-2.5 rotate-1 shadow-2xl shadow-black/70 z-30 hidden lg:flex items-center gap-2.5 ring-1 ring-black/50"
-                  initial={{ opacity: 0, scale: 0.8, y: 8 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ ...springs.snappy, delay: 2.8 }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/images/mockup/member-3.jpg"
-                    alt=""
-                    className="w-6 h-6 rounded-full object-cover shrink-0"
-                  />
-                  <div>
-                    <p className="text-xs font-medium text-text-primary">
-                      Jess joined your Swaplist
-                    </p>
-                    <p className="text-[11px] text-text-tertiary">Weekend Vibes &middot; 5m ago</p>
-                  </div>
-                </m.div>
-
-                {/* Phone slides in from the right */}
-                <m.div
-                  initial={{ opacity: 0, x: 80 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 50,
-                    damping: 16,
-                    delay: 1.2,
-                  }}
-                >
-                  <PhoneMockup />
+                  <SpotifyChangesBanner />
                 </m.div>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* ───────── Feature cards ───────── */}
+      <FeatureCards onGetStarted={() => setShowGetStarted(true)} />
 
       {/* ───────── Footer ───────── */}
       <footer className="border-t border-glass-border">

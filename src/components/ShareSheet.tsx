@@ -203,7 +203,7 @@ export default function ShareSheet({
           <div className="flex gap-2">
             <input
               type="email"
-              placeholder="friend@example.com"
+              placeholder="friend's Spotify email"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -222,6 +222,9 @@ export default function ShareSheet({
               {sending ? 'Sending...' : 'Send'}
             </button>
           </div>
+          <p className="text-xs text-text-tertiary mt-1.5">
+            Must be the email linked to their Spotify account
+          </p>
           {emailStatus && (
             <p
               className={`text-sm mt-2 ${

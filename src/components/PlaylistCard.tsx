@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { springs } from '@/lib/motion';
+import { useCardTint } from '@/hooks/useAlbumColors';
 
 interface PlaylistCardProps {
   playlist: {
@@ -25,13 +26,22 @@ interface PlaylistCardProps {
 }
 
 export default function PlaylistCard({ playlist }: PlaylistCardProps) {
+  const tint = useCardTint(playlist.imageUrl);
+
   return (
     <motion.div whileTap={{ scale: 0.98 }} transition={springs.snappy}>
       <Link
         href={`/playlist/${playlist.id}`}
-        className="glass rounded-2xl p-3.5 block active:bg-white/6 transition-colors glow-brand-hover"
+        className="glass rounded-2xl p-3.5 block active:bg-white/6 transition-colors glow-brand-hover overflow-hidden relative"
       >
-        <div className="flex items-center gap-3.5">
+        {/* Color tint from album art */}
+        {tint.background && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: tint.background }}
+          />
+        )}
+        <div className="flex items-center gap-3.5 relative">
           {/* Cover image with avatar overlay */}
           <div className="relative w-14 h-14 shrink-0">
             <div className="w-14 h-14 rounded-lg overflow-hidden">
@@ -62,7 +72,12 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
             </p>
 
             {playlist.vibeName && playlist.activeTrackCount > 3 && (
-              <p className="text-sm text-brand italic truncate mt-0.5">{playlist.vibeName}</p>
+              <p
+                className="text-sm italic truncate mt-0.5"
+                style={tint.vibeColor ? { color: tint.vibeColor } : undefined}
+              >
+                {playlist.vibeName}
+              </p>
             )}
 
             {/* Metadata line */}

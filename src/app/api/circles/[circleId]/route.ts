@@ -89,8 +89,8 @@ export async function PATCH(
 
   if (maxMembers !== undefined) {
     const parsed = Number(maxMembers);
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 50) {
-      return NextResponse.json({ error: 'maxMembers must be between 1 and 50' }, { status: 400 });
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 6) {
+      return NextResponse.json({ error: 'maxMembers must be between 1 and 6' }, { status: 400 });
     }
     updates.maxMembers = parsed;
   }

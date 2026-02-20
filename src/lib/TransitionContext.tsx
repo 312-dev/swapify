@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useRef, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getTransitionType, type TransitionType } from './transition';
 
@@ -12,13 +12,13 @@ export function useTransitionType() {
 
 export function TransitionDirectionProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const prevPathRef = useRef<string | null>(null);
-  const [type, setType] = useState<TransitionType>('none');
+  const [state, setState] = useState({ path: pathname, type: 'none' as TransitionType });
 
-  useEffect(() => {
-    setType(getTransitionType(prevPathRef.current, pathname));
-    prevPathRef.current = pathname;
-  }, [pathname]);
+  // Compute transition type synchronously during render (derived state pattern).
+  // This avoids the one-render-behind lag that useEffect would cause.
+  if (pathname !== state.path) {
+    setState({ path: pathname, type: getTransitionType(state.path, pathname) });
+  }
 
-  return <TransitionContext.Provider value={type}>{children}</TransitionContext.Provider>;
+  return <TransitionContext.Provider value={state.type}>{children}</TransitionContext.Provider>;
 }

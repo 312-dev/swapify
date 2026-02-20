@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { compressImageForSpotify } from '@/lib/image-compress';
 import { ImagePlus, Pencil, Plus, Search, Download, ChevronRight, ChevronLeft } from 'lucide-react';
+import { PlusIcon } from '@/components/icons/PlusIcon';
 import { m } from 'motion/react';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
 import PlaylistCard from '@/components/PlaylistCard';
@@ -100,6 +101,7 @@ const VIBE_PLACEHOLDERS: Array<{
   desc: string;
   vibeLine: string;
   imageUrl: string;
+  accent: string; // HSL accent color for vibe text & row tint
 }> = [
   {
     name: 'late night drives',
@@ -107,6 +109,7 @@ const VIBE_PLACEHOLDERS: Array<{
     vibeLine: 'moody R&B \u00b7 chill rap \u00b7 slow jams',
     imageUrl:
       'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=112&h=112&fit=crop&auto=format',
+    accent: '270, 80%, 70%', // purple
   },
   {
     name: 'UNHINGED BANGERS',
@@ -114,6 +117,7 @@ const VIBE_PLACEHOLDERS: Array<{
     vibeLine: 'hyperpop \u00b7 hard drops \u00b7 EDM',
     imageUrl:
       'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=112&h=112&fit=crop&auto=format',
+    accent: '350, 85%, 65%', // hot pink
   },
   {
     name: 'main character energy',
@@ -121,6 +125,7 @@ const VIBE_PLACEHOLDERS: Array<{
     vibeLine: 'indie pop \u00b7 alt \u00b7 cinematic',
     imageUrl:
       'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=112&h=112&fit=crop&auto=format',
+    accent: '30, 90%, 65%', // warm amber
   },
   {
     name: 'COZY GIRL AUTUMN',
@@ -128,6 +133,7 @@ const VIBE_PLACEHOLDERS: Array<{
     vibeLine: 'soft folk \u00b7 acoustic \u00b7 bedroom pop',
     imageUrl:
       'https://images.unsplash.com/photo-1508193638397-1c4234db14d8?w=112&h=112&fit=crop&auto=format',
+    accent: '145, 70%, 60%', // forest green
   },
   {
     name: 'gym arc',
@@ -135,6 +141,7 @@ const VIBE_PLACEHOLDERS: Array<{
     vibeLine: 'trap \u00b7 drill \u00b7 rage beats',
     imageUrl:
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=112&h=112&fit=crop&auto=format',
+    accent: '0, 85%, 65%', // red
   },
   {
     name: 'TOUCH GRASS',
@@ -142,6 +149,7 @@ const VIBE_PLACEHOLDERS: Array<{
     vibeLine: 'feel-good \u00b7 summer hits \u00b7 throwbacks',
     imageUrl:
       'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=112&h=112&fit=crop&auto=format',
+    accent: '55, 85%, 60%', // golden yellow
   },
 ];
 
@@ -375,62 +383,89 @@ export default function DashboardClient({
 
       {/* Circle switcher — centered at top, Life360 style */}
       {circles.length > 0 && (
-        <div className="pt-5 pb-2 flex justify-center" data-tour="circle-switcher">
+        <m.div
+          className="pt-5 pb-2 flex justify-center"
+          data-tour="circle-switcher"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: 0.05 }}
+        >
           <CircleSwitcher
             circles={circles}
             activeCircleId={activeCircleId}
             activeCircleName={activeCircleName}
           />
-        </div>
+        </m.div>
       )}
 
       {/* Header */}
-      <header className="px-5 pt-2 pb-4 flex items-start justify-between">
+      <m.header
+        className="px-5 pt-2 pb-4 flex items-start justify-between"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...springs.gentle, delay: 0.1 }}
+      >
         <div>
           <p className="text-base text-text-secondary">{greeting},</p>
           <h1 className="text-3xl font-bold text-text-primary mt-1">Your Swaplists</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              resetImportState();
-              setShowImport(true);
-            }}
-            className="relative group w-10 h-10 rounded-full bg-brand flex items-center justify-center"
-            aria-label="Import from Spotify"
-          >
-            <Download className="w-5 h-5 text-black" />
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Import
-            </span>
-          </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="relative group w-10 h-10 rounded-full bg-brand flex items-center justify-center"
-            aria-label="Create a Swaplist"
-            data-tour="create-swaplist"
-          >
-            <Plus className="w-5 h-5 text-black" strokeWidth={2.5} />
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Create
-            </span>
-          </button>
-        </div>
-      </header>
+        {playlists.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                resetImportState();
+                setShowImport(true);
+              }}
+              className="relative group w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors"
+              aria-label="Import from Spotify"
+            >
+              <Download className="w-5 h-5 text-text-secondary" />
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                Import
+              </span>
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="relative group w-10 h-10 rounded-full bg-brand flex items-center justify-center"
+              aria-label="Create a Swaplist"
+              data-tour="create-swaplist"
+            >
+              <Plus className="w-5 h-5 text-black" strokeWidth={2.5} />
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                Create
+              </span>
+            </button>
+          </div>
+        )}
+      </m.header>
 
       {/* Playlist list */}
       {playlists.length === 0 ? (
-        <div className="px-4 pt-2 pb-6">
+        <m.div
+          className="px-4 pt-2 pb-6"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: 0.15 }}
+        >
           <div className="relative overflow-hidden">
             {/* Decorative placeholder cards */}
             <div className="space-y-2 opacity-40 pointer-events-none">
               {VIBE_PLACEHOLDERS.slice(0, 5).map((vibe, i) => (
                 <div
                   key={vibe.name}
-                  className="glass rounded-2xl p-3.5 w-full text-left"
-                  style={i >= 2 ? { filter: `blur(${(i - 1) * 1.5}px)` } : undefined}
+                  className="glass rounded-2xl p-3.5 w-full text-left overflow-hidden relative"
+                  style={{
+                    ...(i >= 2 ? { filter: `blur(${(i - 1) * 1.5}px)` } : {}),
+                  }}
                 >
-                  <div className="flex items-center gap-3.5">
+                  {/* Accent tint glow */}
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: `linear-gradient(135deg, hsla(${vibe.accent}, 0.12) 0%, transparent 60%)`,
+                    }}
+                  />
+                  <div className="flex items-center gap-3.5 relative">
                     <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden">
                       <img src={vibe.imageUrl} alt="" className="w-full h-full object-cover" />
                     </div>
@@ -438,7 +473,12 @@ export default function DashboardClient({
                       <p className="text-[15px] font-semibold truncate text-text-primary leading-tight">
                         {vibe.name}
                       </p>
-                      <p className="text-sm text-brand italic truncate mt-0.5">{vibe.vibeLine}</p>
+                      <p
+                        className="text-sm italic truncate mt-0.5"
+                        style={{ color: `hsl(${vibe.accent})` }}
+                      >
+                        {vibe.vibeLine}
+                      </p>
                       <p className="text-sm text-text-tertiary mt-0.5">{vibe.desc}</p>
                     </div>
                     <svg
@@ -465,22 +505,33 @@ export default function DashboardClient({
                 maskImage: 'linear-gradient(to bottom, transparent, black)',
               }}
             />
-            {/* Action button — floating centered over the list */}
+            {/* Action buttons — floating centered over the list */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div
-                className="rounded-full px-5 py-4"
+                className="rounded-full px-5 py-4 flex flex-col items-center gap-2.5"
                 style={{
                   background:
                     'radial-gradient(ellipse at center, var(--background) 30%, transparent 70%)',
                 }}
               >
                 <button onClick={() => setShowCreate(true)} className="btn-pill btn-pill-primary">
+                  <PlusIcon size={16} loopInterval={5000} className="text-black" />
                   Create Swaplist
+                </button>
+                <button
+                  onClick={() => {
+                    resetImportState();
+                    setShowImport(true);
+                  }}
+                  className="btn-pill btn-pill-secondary"
+                >
+                  <Download className="w-4 h-4" />
+                  Import Playlist
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </m.div>
       ) : (
         <div className="px-4 space-y-2">
           <NotificationPrompt notifyPush={notifyPush} />
@@ -489,7 +540,7 @@ export default function DashboardClient({
               key={playlist.id}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springs.gentle, delay: i * STAGGER_DELAY }}
+              transition={{ ...springs.gentle, delay: 0.15 + i * STAGGER_DELAY }}
             >
               <PlaylistCard playlist={playlist} />
             </m.div>
