@@ -251,7 +251,7 @@ export default function CircleSettingsClient({ circle, isHost }: CircleSettingsC
           className="flex items-center gap-3 mb-6"
         >
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.back()}
             className="text-text-secondary hover:text-text-primary transition-colors"
             aria-label="Back to dashboard"
           >

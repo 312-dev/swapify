@@ -33,6 +33,7 @@ interface PlaylistDetailClientProps {
   circleName: string;
   circleId: string;
   spotifyClientId: string;
+  circleMemberCount: number;
 }
 
 interface TrackData {
@@ -115,6 +116,7 @@ export default function PlaylistDetailClient({
   circleName,
   circleId,
   spotifyClientId,
+  circleMemberCount,
 }: PlaylistDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -198,14 +200,19 @@ export default function PlaylistDetailClient({
     return () => clearInterval(interval);
   }, [fetchTracks]);
 
-  // Auto-open share sheet when arriving from playlist creation (host only)
+  // Auto-open share sheet when arriving from playlist creation (host only, solo circle)
+  const shareTriggered = useRef(false);
   useEffect(() => {
-    if (isOwner && searchParams.get('share') === '1') {
-      setShowShare(true);
+    if (isOwner && searchParams.get('share') === '1' && !shareTriggered.current) {
+      shareTriggered.current = true;
       // Clean the URL without triggering a navigation
       window.history.replaceState({}, '', `/playlist/${playlistId}`);
+      // Only show invite sheet if the host is the only circle member
+      if (circleMemberCount <= 1) {
+        setShowShare(true);
+      }
     }
-  }, [searchParams, playlistId, isOwner]);
+  }, [searchParams, playlistId, isOwner, circleMemberCount]);
 
   async function syncFromSpotify() {
     setSyncing(true);

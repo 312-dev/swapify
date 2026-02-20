@@ -52,7 +52,7 @@ export default function PlaylistTabs({
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex-1 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+            className={`relative flex-1 flex items-center justify-center py-2.5 text-sm font-semibold rounded-lg transition-colors ${
               isActive || hasInboxItems ? 'text-text-primary' : 'text-text-tertiary'
             }`}
           >
@@ -63,7 +63,7 @@ export default function PlaylistTabs({
                 transition={springs.snappy}
               />
             )}
-            <span className="relative z-10 inline-flex items-center justify-center gap-1.5">
+            <span className="relative z-10 flex items-center justify-center gap-1.5">
               {isInbox && <ShareSongIcon className="w-3.5 h-3.5 shrink-0" />}
               {tab.id === 'liked' && <ThumbsUp className="w-3.5 h-3.5 shrink-0" />}
               {tab.id === 'outcasts' && <ThumbsDown className="w-3.5 h-3.5 shrink-0" />}

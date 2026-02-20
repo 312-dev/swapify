@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import Link from 'next/link';
 import {
   formatRemovalDelay,
   type RemovalDelay,
@@ -102,8 +101,8 @@ export default function PlaylistSettingsPage() {
       <div className="max-w-md mx-auto px-5 py-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link
-            href={`/playlist/${playlistId}`}
+          <button
+            onClick={() => router.back()}
             className="text-text-secondary hover:text-text-primary transition-colors"
             aria-label="Back to playlist"
           >
@@ -115,7 +114,7 @@ export default function PlaylistSettingsPage() {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-          </Link>
+          </button>
           <h1 className="text-3xl font-bold text-text-primary">Settings</h1>
         </div>
 

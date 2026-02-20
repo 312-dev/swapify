@@ -1,8 +1,8 @@
 import { Suspense } from 'react';
 import { requireVerifiedEmail } from '@/lib/auth';
 import { db } from '@/db';
-import { playlists, playlistMembers } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { playlists, playlistMembers, circleMembers } from '@/db/schema';
+import { eq, and, count } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import PlaylistDetailClient from './PlaylistDetailClient';
 
@@ -25,6 +25,12 @@ export default async function PlaylistDetailPage({
   });
   if (!playlist) notFound();
 
+  const circleMemberRows = await db
+    .select({ count: count() })
+    .from(circleMembers)
+    .where(eq(circleMembers.circleId, playlist.circleId));
+  const circleMemberCount = circleMemberRows[0]?.count ?? 0;
+
   return (
     <Suspense>
       <PlaylistDetailClient
@@ -41,6 +47,7 @@ export default async function PlaylistDetailPage({
         circleName={playlist.circle.name}
         circleId={playlist.circle.id}
         spotifyClientId={playlist.circle.spotifyClientId}
+        circleMemberCount={circleMemberCount}
       />
     </Suspense>
   );

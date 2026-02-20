@@ -11,7 +11,13 @@ interface BeforeInstallPromptEvent extends Event {
 
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('install-prompt-dismissed') === '1';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     // Don't show if already installed or on desktop
@@ -36,11 +42,17 @@ export default function InstallPrompt() {
       setDeferredPrompt(null);
     }
     setDismissed(true);
+    try {
+      sessionStorage.setItem('install-prompt-dismissed', '1');
+    } catch {}
   }, [deferredPrompt]);
 
   const handleDismiss = useCallback(() => {
     setDismissed(true);
     setDeferredPrompt(null);
+    try {
+      sessionStorage.setItem('install-prompt-dismissed', '1');
+    } catch {}
   }, []);
 
   const show = deferredPrompt && !dismissed;

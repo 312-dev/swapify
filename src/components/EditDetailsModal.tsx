@@ -86,8 +86,15 @@ export default function EditDetailsModal({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to update');
+        const text = await res.text();
+        let message = 'Failed to update';
+        try {
+          const data = JSON.parse(text);
+          message = data.error || message;
+        } catch {
+          // non-JSON error response
+        }
+        throw new Error(message);
       }
 
       toast.success('Details saved');

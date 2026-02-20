@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
     await db.insert(playlists).values({
       id: playlistId,
       name: defaultName,
-      description: description || null,
+      description: description || 'A Swapify shared playlist — songs in, listens out',
       spotifyPlaylistId: spotifyPlaylist.id,
       ownerId: user.id,
       circleId,

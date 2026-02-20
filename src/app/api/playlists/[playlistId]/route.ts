@@ -164,7 +164,8 @@ export async function PATCH(
         { status: 401 }
       );
     }
-    throw err;
+    const message = err instanceof Error ? err.message : 'Spotify API error';
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 
   if (Object.keys(updates).length > 0) {
