@@ -17,8 +17,8 @@
   --glass-bg-hover: rgba(255, 255, 255, 0.1);
   --surface-elevated: #1a1a1a;
   --text-primary: #ffffff;
-  --text-secondary: #b5b5b5;
-  --text-tertiary: #787878;
+  --text-secondary: #c4c4c4;
+  --text-tertiary: #8e8e8e;
   --bottom-nav-height: 5rem;
 
   /* shadcn semantic tokens — mapped to dark theme */
@@ -60,6 +60,7 @@
   --font-sans: var(--font-epilogue);
   --font-display: var(--font-cal-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-montserrat);
 
   /* shadcn semantic colors */
   --color-background: var(--background);
@@ -103,7 +104,7 @@ html {
 }
 
 body {
-  font-family: var(--font-epilogue), Arial, Helvetica, sans-serif;
+  font-family: var(--font-epilogue), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
@@ -133,6 +134,20 @@ body {
     var(--bg-gradient-start) 0%,
     var(--bg-gradient-end) 70%
   );
+}
+
+/* Subtle film grain overlay — adds tactile analog depth */
+.grain-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
 /* Safe area padding for PWA */
@@ -316,11 +331,13 @@ body {
 .btn-pill-primary {
   background: var(--brand);
   color: #000;
+  box-shadow: 0 4px 24px rgba(56, 189, 248, 0.2);
 }
 
 .btn-pill-primary:hover {
   background: var(--brand-hover);
   transform: scale(1.02);
+  box-shadow: 0 6px 32px rgba(56, 189, 248, 0.3);
 }
 
 .btn-pill-primary:active {
@@ -367,6 +384,47 @@ body {
 /* Unread tracks badge */
 .unread-badge {
   box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+}
+
+/* Brand glow — colored shadow for interactive elements */
+.glow-brand {
+  box-shadow:
+    0 0 20px rgba(56, 189, 248, 0.15),
+    0 0 60px rgba(56, 189, 248, 0.05);
+}
+
+.glow-brand-hover:hover {
+  box-shadow:
+    0 0 24px rgba(56, 189, 248, 0.25),
+    0 0 80px rgba(56, 189, 248, 0.08);
+}
+
+.glow-green {
+  box-shadow:
+    0 0 20px rgba(74, 222, 128, 0.15),
+    0 0 60px rgba(74, 222, 128, 0.05);
+}
+
+/* Aurora accent — subtle animated gradient for decorative depth */
+@keyframes aurora-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.aurora-accent {
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.06) 0%,
+    rgba(74, 222, 128, 0.04) 50%,
+    rgba(56, 189, 248, 0.06) 100%
+  );
+  background-size: 200% 200%;
+  animation: aurora-drift 12s ease-in-out infinite;
 }
 
 /* Pending reaction pulse indicator */

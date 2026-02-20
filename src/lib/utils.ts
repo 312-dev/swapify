@@ -11,7 +11,7 @@ export function generateId(): string {
 }
 
 export function generateInviteCode(): string {
-  return nanoid(8);
+  return nanoid(8).toLowerCase();
 }
 
 /**
@@ -82,6 +82,18 @@ export function formatRemovalDelay(delay: RemovalDelay): string {
   };
   return labels[delay] ?? 'Immediately';
 }
+
+// ─── Sort Mode ──────────────────────────────────────────────────────────────
+
+export const SORT_MODES = ['order_added', 'energy_desc', 'energy_asc', 'round_robin'] as const;
+export type SortMode = (typeof SORT_MODES)[number];
+
+export const SORT_MODE_LABELS: Record<SortMode, string> = {
+  order_added: 'Order Added',
+  energy_desc: 'Most Energetic First',
+  energy_asc: 'Least Energetic First',
+  round_robin: 'Round Robin',
+};
 
 export function formatRelativeTime(date: Date): string {
   const now = new Date();

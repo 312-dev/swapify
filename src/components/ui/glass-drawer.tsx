@@ -38,7 +38,7 @@ export default function GlassDrawer({
       }}
     >
       <DrawerContent
-        className={`border-t border-white/[0.08] rounded-t-[20px] bg-[var(--surface-elevated)] backdrop-blur-xl ${HEIGHT_CLASS[snapPoint]}`}
+        className={`border-t border-white/[0.12] rounded-t-[20px] !bg-[#1a1a1a] ${HEIGHT_CLASS[snapPoint]}`}
       >
         {/* Accessible title — handle bar provided by DrawerContent */}
         <DrawerHeader className="p-0">
