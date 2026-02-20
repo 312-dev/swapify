@@ -18,6 +18,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { compressImageForSpotify } from '@/lib/image-compress';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
 import AddMemberWizard from '@/components/AddMemberWizard';
 import {
@@ -88,16 +89,16 @@ export default function CircleSettingsClient({ circle, isHost }: CircleSettingsC
 
   // ── Image handling ──
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 256 * 1024) {
-      toast.error('Image must be under 256KB');
-      return;
+
+    try {
+      const dataUrl = await compressImageForSpotify(file);
+      setEditImagePreview(dataUrl);
+    } catch {
+      toast.error('Image could not be compressed under 256KB');
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => setEditImagePreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
   }
 
   // ── Save circle edits ──
@@ -295,7 +296,7 @@ export default function CircleSettingsClient({ circle, isHost }: CircleSettingsC
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/jpeg,image/png"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handleImageSelect}
                     className="hidden"
                   />

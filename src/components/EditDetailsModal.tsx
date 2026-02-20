@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { compressImageForSpotify } from '@/lib/image-compress';
 import {
   Dialog,
   DialogContent,
@@ -48,21 +49,17 @@ export default function EditDetailsModal({
     onOpenChange(nextOpen);
   }
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 256 * 1024) {
-      toast.error('Image must be under 256KB for Spotify');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setImagePreview(ev.target?.result as string);
+    try {
+      const dataUrl = await compressImageForSpotify(file);
+      setImagePreview(dataUrl);
       setHasNewImage(true);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      toast.error('Image could not be compressed under 256KB');
+    }
   }
 
   async function handleSave() {
@@ -144,7 +141,7 @@ export default function EditDetailsModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleImageSelect}
               className="hidden"
             />
