@@ -18,6 +18,7 @@ import {
   checkSavedTracks,
   isRateLimited,
   TokenInvalidError,
+  refreshAccessToken,
 } from './spotify';
 import { sendEmail } from './email';
 import { generateId, getRemovalDelayMs, type RemovalDelay } from './utils';
@@ -189,6 +190,22 @@ export async function runPollCycle(): Promise<PollCycleResult> {
       await syncAllLikedPlaylists();
     } catch (error) {
       logger.error({ error }, '[Swapify] Liked playlist sync error');
+    }
+  }
+
+  // 10. Token keepalive: proactively refresh tokens for ALL circle members
+  //     (not just those in active playlists) so hosts, inactive members, etc.
+  //     don't end up with stale tokens when they're suddenly needed.
+  tokenKeepaliveCycleCount++;
+  if (tokenKeepaliveCycleCount >= spotifyConfig.tokenKeepaliveEveryNCycles) {
+    tokenKeepaliveCycleCount = 0;
+    try {
+      const refreshed = await refreshStaleTokens();
+      if (refreshed > 0) {
+        logger.info(`[Swapify] Token keepalive: refreshed ${refreshed} stale tokens`);
+      }
+    } catch (error) {
+      logger.error({ error }, '[Swapify] Token keepalive sweep error');
     }
   }
 
@@ -768,6 +785,8 @@ let auditCycleCount = 0;
 
 let likedSyncCycleCount = 0;
 
+let tokenKeepaliveCycleCount = 0;
+
 export async function runPlaylistAudit(): Promise<{
   unauthorizedRemoved: number;
   overLimitRemoved: number;
@@ -1006,6 +1025,73 @@ async function syncAllLikedPlaylists(): Promise<void> {
       logger.error({ error, userId: member.userId }, '[Swapify] Liked sync error for member');
     }
   }
+}
+
+// ─── Token Keepalive ────────────────────────────────────────────────────────
+
+/**
+ * Proactively refresh tokens for ALL circle members whose access tokens
+ * are within 10 minutes of expiry. This covers hosts, inactive members,
+ * and anyone not currently in a playlist with active tracks — ensuring
+ * their refresh tokens stay rotated and valid.
+ */
+async function refreshStaleTokens(): Promise<number> {
+  const expiryThreshold = Math.floor(Date.now() / 1000) + 600; // 10 minutes from now
+
+  const staleMembers = await db.query.circleMembers.findMany({
+    where: and(
+      isNotNull(circleMembers.refreshToken),
+      // Has a non-empty refresh token (empty = previously invalidated)
+      ne(circleMembers.refreshToken, ''),
+      // Token expires within 10 minutes
+      lt(circleMembers.tokenExpiresAt, expiryThreshold)
+    ),
+  });
+
+  let refreshed = 0;
+
+  for (const member of staleMembers) {
+    if (isRateLimited() || isOverBudget()) break;
+
+    try {
+      await refreshAccessToken(member.userId, member.circleId);
+      refreshed++;
+    } catch (error) {
+      if (error instanceof TokenInvalidError) {
+        logger.warn(
+          `[Swapify] Token keepalive: token invalid for user ${member.userId} in circle ${member.circleId}, clearing`
+        );
+        await db
+          .update(circleMembers)
+          .set({ refreshToken: '' })
+          .where(
+            and(
+              eq(circleMembers.userId, member.userId),
+              eq(circleMembers.circleId, member.circleId)
+            )
+          );
+
+        // Notify user via email
+        const user = await db.query.users.findFirst({ where: eq(users.id, member.userId) });
+        if (user?.email) {
+          await sendEmail(
+            user.email,
+            'Your Spotify connection needs attention',
+            'Your Spotify session has expired and we can no longer track your listening. Please log in to Swapify again to reconnect your account.',
+            process.env.NEXT_PUBLIC_APP_URL || 'https://swapify.app',
+            user.id
+          );
+        }
+        continue;
+      }
+      logger.error(
+        { error, userId: member.userId, circleId: member.circleId },
+        '[Swapify] Token keepalive refresh error'
+      );
+    }
+  }
+
+  return refreshed;
 }
 
 // ─── Polling Loop ───────────────────────────────────────────────────────────

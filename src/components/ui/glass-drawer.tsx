@@ -24,6 +24,8 @@ interface GlassDrawerProps {
   children: ReactNode;
   /** "half" limits height to ~50vh, "full" to ~90vh. Default: "full" */
   snapPoint?: 'half' | 'full';
+  /** Slide direction. Default: "bottom" */
+  direction?: 'top' | 'bottom';
 }
 
 const HEIGHT_CLASS: Record<string, string> = {
@@ -37,6 +39,7 @@ export default function GlassDrawer({
   title,
   children,
   snapPoint = 'full',
+  direction = 'bottom',
 }: GlassDrawerProps) {
   const isDesktop = useMediaQuery('(min-width: 640px)');
 
@@ -63,24 +66,35 @@ export default function GlassDrawer({
     );
   }
 
-  // Mobile: bottom drawer
+  const isTop = direction === 'top';
+
+  // Mobile: sliding drawer
   return (
-    <Drawer open={isOpen} onOpenChange={handleOpenChange}>
+    <Drawer open={isOpen} onOpenChange={handleOpenChange} direction={direction}>
       <DrawerContent
-        className={`border-t border-white/[0.12] rounded-t-[20px] !bg-[#1a1a1a] ${HEIGHT_CLASS[snapPoint]}`}
+        className={`${isTop ? 'border-b rounded-b-[20px]' : 'border-t rounded-t-[20px]'} border-white/[0.12] !bg-[#1a1a1a] ${HEIGHT_CLASS[snapPoint]}`}
       >
         <DrawerHeader className="p-0">
           {title ? (
-            <DrawerTitle className="text-xl font-bold text-center mb-4 px-6">{title}</DrawerTitle>
+            <DrawerTitle
+              className={`text-xl font-bold text-center ${isTop ? 'mt-2 mb-4' : 'mb-4'} px-6`}
+            >
+              {title}
+            </DrawerTitle>
           ) : (
             <DrawerTitle className="sr-only">Drawer</DrawerTitle>
           )}
           <DrawerDescription className="sr-only">{title || 'Drawer panel'}</DrawerDescription>
         </DrawerHeader>
 
-        <div className="px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] overflow-y-auto">
+        <div
+          className={`px-6 ${isTop ? 'pb-6' : 'pb-[calc(2rem+env(safe-area-inset-bottom))]'} overflow-y-auto`}
+        >
           {children}
         </div>
+
+        {/* Drag handle for top drawers */}
+        {isTop && <div className="bg-muted mx-auto mb-4 h-2 w-[100px] shrink-0 rounded-full" />}
       </DrawerContent>
     </Drawer>
   );

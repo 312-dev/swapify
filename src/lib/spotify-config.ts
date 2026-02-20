@@ -68,6 +68,11 @@ export const spotifyConfig = {
   get likedSyncEveryNCycles() {
     return isSpotifyDevMode() ? 10 : 4;
   },
+
+  /** How often to run token keepalive sweep (in poll cycles) */
+  get tokenKeepaliveEveryNCycles() {
+    return isSpotifyDevMode() ? 20 : 10;
+  },
 } as const;
 
 // ─── Global API Call Budget Tracker ─────────────────────────────────────────

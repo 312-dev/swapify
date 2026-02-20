@@ -569,15 +569,17 @@ export default function PlaylistDetailClient({
           {/* Active tracks */}
           <div className="px-4 space-y-2">
             {initialLoading ? (
-              [...Array(3)].map((_, i) => (
-                <div key={i} className="glass rounded-xl p-3 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg skeleton shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 skeleton w-3/5" />
-                    <div className="h-3 skeleton w-2/5" />
+              <div className="space-y-2 loading-delayed">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass rounded-xl p-3 flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg skeleton shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 skeleton w-3/5" />
+                      <div className="h-3 skeleton w-2/5" />
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : tracks.length === 0 ? (
               <div className="text-center py-12 text-text-tertiary">
                 <p className="text-base">No tracks yet. Search above to add one.</p>

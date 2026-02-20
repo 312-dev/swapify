@@ -14,6 +14,7 @@ import type {
 } from '@/types/spotify';
 
 import { trackSpotifyApiCall, waitForBudget, spotifyConfig } from '@/lib/spotify-config';
+import { logger } from '@/lib/logger';
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const SPOTIFY_ACCOUNTS = 'https://accounts.spotify.com';
@@ -101,14 +102,39 @@ async function _doRefresh(userId: string, circleId: string): Promise<string> {
 
   const data: SpotifyTokenResponse = await res.json();
 
-  await db
-    .update(circleMembers)
-    .set({
-      accessToken: encrypt(data.access_token),
-      refreshToken: data.refresh_token ? encrypt(data.refresh_token) : member.refreshToken,
-      tokenExpiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
-    })
-    .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
+  // CRITICAL: Spotify PKCE rotates refresh tokens — the old one may now be invalid.
+  // If this DB update fails, the new refresh token is lost and the user is locked out.
+  // Retry once before giving up, and still return the access token so the current request succeeds.
+  const tokenPayload = {
+    accessToken: encrypt(data.access_token),
+    refreshToken: data.refresh_token ? encrypt(data.refresh_token) : member.refreshToken,
+    tokenExpiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
+  };
+
+  try {
+    await db
+      .update(circleMembers)
+      .set(tokenPayload)
+      .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
+  } catch (dbError) {
+    logger.error(
+      { error: dbError, userId, circleId },
+      '[Swapify] CRITICAL: Failed to save rotated refresh token — retrying once'
+    );
+    try {
+      await db
+        .update(circleMembers)
+        .set(tokenPayload)
+        .where(and(eq(circleMembers.userId, userId), eq(circleMembers.circleId, circleId)));
+    } catch (retryError) {
+      // Token rotation succeeded at Spotify but we couldn't persist it.
+      // The access token still works for ~1 hour; log so we can investigate.
+      logger.error(
+        { error: retryError, userId, circleId },
+        '[Swapify] CRITICAL: Retry also failed — rotated refresh token lost. User will need to re-auth when access token expires.'
+      );
+    }
+  }
 
   return data.access_token;
 }

@@ -85,7 +85,7 @@ export default function ActivityClient() {
       </div>
 
       {loading ? (
-        <div className="px-5 space-y-3">
+        <div className="px-5 space-y-3 loading-delayed">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center gap-3 p-3">
               <div className="w-10 h-10 rounded-full skeleton" />

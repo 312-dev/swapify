@@ -46,10 +46,11 @@ export async function GET(request: NextRequest) {
   session.codeVerifier = codeVerifier;
   session.spotifyClientId = clientId;
   const inviteToken = request.nextUrl.searchParams.get('inviteToken');
-  if (returnTo) session.returnTo = returnTo;
-  if (circleId) session.pendingCircleId = circleId;
-  if (circleAction) session.pendingCircleAction = circleAction;
-  if (inviteToken) session.pendingInviteToken = inviteToken;
+  // Always clear transient OAuth fields so stale values from previous attempts don't bleed through
+  session.returnTo = returnTo ?? undefined;
+  session.pendingCircleId = circleId ?? undefined;
+  session.pendingCircleAction = circleAction ?? undefined;
+  session.pendingInviteToken = inviteToken ?? undefined;
   await session.save();
 
   const scopes = [
@@ -74,6 +75,10 @@ export async function GET(request: NextRequest) {
     state,
     code_challenge_method: 'S256',
     code_challenge: codeChallenge,
+    // Skip consent screen for users who already authorized this app+scopes.
+    // NOTE: Spotify apps in Development Mode may still show consent every time —
+    // this is a Spotify platform limitation until the app gets Extended Quota Mode.
+    show_dialog: 'false',
   });
 
   return NextResponse.redirect(`https://accounts.spotify.com/authorize?${params}`);

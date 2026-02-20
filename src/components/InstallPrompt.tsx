@@ -53,7 +53,7 @@ export default function InstallPrompt() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 72 }}
           transition={springs.smooth}
-          className="fixed bottom-24 left-4 right-4 z-50 rounded-2xl p-4 flex items-center gap-3 bg-neutral-800 border border-white/10 sm:bottom-4 sm:left-auto sm:right-4 sm:max-w-md"
+          className="fixed left-4 right-4 z-50 rounded-2xl p-4 flex items-center gap-3 bg-neutral-800 border border-white/10 bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-4 sm:left-auto sm:right-4 sm:max-w-md"
         >
           <img src="/icons/icon-192.png" alt="Swapify" className="w-10 h-10 rounded-xl shrink-0" />
           <div className="flex-1 min-w-0">

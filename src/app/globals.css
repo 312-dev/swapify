@@ -305,6 +305,20 @@ body {
   border-radius: 8px;
 }
 
+/* Delayed loading container — prevents skeleton flash on fast loads */
+@keyframes fade-in-delayed {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.loading-delayed {
+  animation: fade-in-delayed 0.2s ease-out 0.15s both;
+}
+
 /* Drop zone styles */
 .drop-zone-active {
   border-color: var(--brand) !important;

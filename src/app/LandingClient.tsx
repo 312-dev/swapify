@@ -529,9 +529,6 @@ export default function LandingClient() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden flex flex-col">
-      {/* ───────── Banner ───────── */}
-      <SpotifyChangesBanner />
-
       {/* ───────── Hero ───────── */}
       <section className="relative flex-1 flex items-center overflow-clip">
         {/* Background */}
@@ -632,6 +629,16 @@ export default function LandingClient() {
 
               {/* Feature tags — icons animate sequentially */}
               <FeatureTags />
+
+              {/* Subtle "How it works" link */}
+              <m.div
+                className="mt-6 flex justify-center lg:justify-start"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.6, duration: 0.5 }}
+              >
+                <SpotifyChangesBanner />
+              </m.div>
             </div>
 
             {/* Right — phone + floating UI elements (hidden on mobile) */}
