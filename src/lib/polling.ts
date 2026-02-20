@@ -147,10 +147,10 @@ export async function runPollCycle(): Promise<PollCycleResult> {
     logger.error({ error }, '[Swapify] Delayed track removal check error');
   }
 
-  // Regenerate vibe names for playlists that had tracks removed
+  // Re-sort playlists that had tracks removed
   for (const playlistId of affectedPlaylistIds) {
-    import('@/lib/vibe-sort').then(({ vibeSort }) => {
-      vibeSort(playlistId).catch(() => {});
+    import('@/lib/playlist-sort').then(({ sortPlaylistTracks }) => {
+      sortPlaylistTracks(playlistId).catch(() => {});
     });
   }
 
@@ -898,10 +898,10 @@ async function auditPlaylist(
     }
   }
 
-  // Auto-sort playlist by vibe when new tracks were adopted (fire-and-forget)
+  // Auto-sort playlist tracks when new tracks were adopted (fire-and-forget)
   if (adopted > 0) {
-    import('./vibe-sort').then(({ vibeSort }) => {
-      vibeSort(playlistId).catch(() => {});
+    import('./playlist-sort').then(({ sortPlaylistTracks }) => {
+      sortPlaylistTracks(playlistId).catch(() => {});
     });
   }
 }

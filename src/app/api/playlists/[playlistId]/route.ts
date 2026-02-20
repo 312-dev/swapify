@@ -3,8 +3,13 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { updatePlaylistDetails, uploadPlaylistImage, getPlaylistDetails } from '@/lib/spotify';
-import { VALID_REMOVAL_DELAYS } from '@/lib/utils';
+import {
+  updatePlaylistDetails,
+  uploadPlaylistImage,
+  getPlaylistDetails,
+  TokenInvalidError,
+} from '@/lib/spotify';
+import { VALID_REMOVAL_DELAYS, SORT_MODES, type SortMode } from '@/lib/utils';
 
 // GET /api/playlists/[playlistId] — playlist detail
 export async function GET(
@@ -65,7 +70,15 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { name, description, imageBase64, maxTracksPerUser, maxTrackAgeDays, removalDelay } = body;
+  const {
+    name,
+    description,
+    imageBase64,
+    maxTracksPerUser,
+    maxTrackAgeDays,
+    removalDelay,
+    sortMode,
+  } = body;
 
   const updates: Partial<typeof playlists.$inferInsert> = {};
   if (name !== undefined) updates.name = name;
@@ -101,34 +114,64 @@ export async function PATCH(
     updates.removalDelay = removalDelay;
   }
 
+  // Handle sort mode
+  if (sortMode !== undefined) {
+    if (!SORT_MODES.includes(sortMode as SortMode)) {
+      return NextResponse.json({ error: 'Invalid sort mode' }, { status: 400 });
+    }
+    updates.sortMode = sortMode;
+  }
+
   // Update Spotify playlist details
   const spotifyUpdates: { name?: string; description?: string } = {};
   if (name) spotifyUpdates.name = name;
   if (description !== undefined) spotifyUpdates.description = description;
 
-  if (Object.keys(spotifyUpdates).length > 0) {
-    await updatePlaylistDetails(
-      user.id,
-      playlist.circleId,
-      playlist.spotifyPlaylistId,
-      spotifyUpdates
-    );
-  }
+  try {
+    if (Object.keys(spotifyUpdates).length > 0) {
+      await updatePlaylistDetails(
+        user.id,
+        playlist.circleId,
+        playlist.spotifyPlaylistId,
+        spotifyUpdates
+      );
+    }
 
-  // Upload cover image if provided, then fetch the CDN URL from Spotify
-  if (imageBase64) {
-    await uploadPlaylistImage(user.id, playlist.circleId, playlist.spotifyPlaylistId, imageBase64);
-    // Spotify processes the image async — fetch the CDN URL it generates
-    const details = await getPlaylistDetails(
-      user.id,
-      playlist.circleId,
-      playlist.spotifyPlaylistId
-    );
-    updates.imageUrl = details.imageUrl;
+    // Upload cover image if provided, then fetch the CDN URL from Spotify
+    if (imageBase64) {
+      await uploadPlaylistImage(
+        user.id,
+        playlist.circleId,
+        playlist.spotifyPlaylistId,
+        imageBase64
+      );
+      // Spotify processes the image async — fetch the CDN URL it generates
+      const details = await getPlaylistDetails(
+        user.id,
+        playlist.circleId,
+        playlist.spotifyPlaylistId
+      );
+      updates.imageUrl = details.imageUrl;
+    }
+  } catch (err) {
+    if (err instanceof TokenInvalidError) {
+      return NextResponse.json(
+        { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
+        { status: 401 }
+      );
+    }
+    throw err;
   }
 
   if (Object.keys(updates).length > 0) {
     await db.update(playlists).set(updates).where(eq(playlists.id, playlistId));
+  }
+
+  // Re-sort tracks if sort mode changed (fire-and-forget)
+  if (sortMode !== undefined && sortMode !== playlist.sortMode) {
+    import('@/lib/playlist-sort').then(({ sortPlaylistTracks }) => {
+      sortPlaylistTracks(playlistId).catch(() => {});
+    });
   }
 
   const updated = await db.query.playlists.findFirst({

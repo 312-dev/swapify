@@ -7,7 +7,8 @@ export async function sendEmail(
   subject: string,
   body: string,
   url?: string,
-  userId?: string
+  userId?: string,
+  buttonLabel?: string
 ): Promise<void> {
   if (!resend) {
     console.warn('[Swapify] Resend not configured, skipping email');
@@ -22,7 +23,7 @@ export async function sendEmail(
       from: 'Swapify <swapify@312.dev>',
       to,
       subject: `Swapify: ${subject}`,
-      html: emailTemplate(subject, body, url, unsubUrl),
+      html: emailTemplate(subject, body, url, unsubUrl, buttonLabel),
       ...(unsubUrl
         ? {
             headers: {
@@ -42,7 +43,8 @@ function emailTemplate(
   title: string,
   body: string,
   url?: string,
-  unsubUrl?: string | null
+  unsubUrl?: string | null,
+  buttonLabel?: string
 ): string {
   return `
 <!DOCTYPE html>
@@ -51,7 +53,7 @@ function emailTemplate(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:'Epilogue',-apple-system,BlinkMacSystemFont,sans-serif;">
   <div style="max-width:480px;margin:0 auto;padding:32px 16px;">
     <div style="text-align:center;margin-bottom:24px;">
       <span style="color:#38BDF8;font-size:24px;font-weight:bold;">Swapify</span>
@@ -59,7 +61,7 @@ function emailTemplate(
     <div style="background:#181818;border-radius:12px;padding:24px;color:#ededed;">
       <h2 style="margin:0 0 8px;font-size:18px;color:#fff;">${title}</h2>
       <p style="margin:0 0 16px;color:#a0a0a0;font-size:14px;line-height:1.5;">${body}</p>
-      ${url ? `<a href="${url}" style="display:inline-block;background:#38BDF8;color:#000;padding:10px 24px;border-radius:24px;text-decoration:none;font-weight:600;font-size:14px;">View in Swapify</a>` : ''}
+      ${url ? `<a href="${url}" style="display:inline-block;background:#38BDF8;color:#000;padding:10px 24px;border-radius:24px;text-decoration:none;font-weight:600;font-size:14px;">${buttonLabel || 'View in Swapify'}</a>` : ''}
     </div>
     <p style="text-align:center;color:#666;font-size:12px;margin-top:16px;">
       You're receiving this because you enabled email notifications in Swapify.${unsubUrl ? `<br><a href="${unsubUrl}" style="color:#666;text-decoration:underline;">Unsubscribe</a>` : ''}

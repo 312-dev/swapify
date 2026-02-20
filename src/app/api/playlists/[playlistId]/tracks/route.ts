@@ -15,6 +15,7 @@ import {
   getPlaylistItems,
   checkSavedTracks,
   isRateLimited,
+  TokenInvalidError,
 } from '@/lib/spotify';
 import { generateId } from '@/lib/utils';
 
@@ -66,7 +67,13 @@ export async function GET(
         const posB = spotifyOrder.get(b.spotifyTrackUri) ?? Infinity;
         return posA - posB;
       });
-    } catch {
+    } catch (err) {
+      if (err instanceof TokenInvalidError) {
+        return NextResponse.json(
+          { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
+          { status: 401 }
+        );
+      }
       // Fall back to addedAt order if Spotify fetch fails
       tracks = dbTracks.sort(
         (a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
@@ -355,6 +362,12 @@ export async function POST(
       spotifyTrackUri,
     ]);
   } catch (err) {
+    if (err instanceof TokenInvalidError) {
+      return NextResponse.json(
+        { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
+        { status: 401 }
+      );
+    }
     console.error('Spotify addItemsToPlaylist failed:', err);
     return NextResponse.json(
       { error: 'Unable to add track to playlist. Please try again.' },
@@ -391,9 +404,9 @@ export async function POST(
     );
   });
 
-  // Auto-sort playlist by vibe (fire-and-forget)
-  import('@/lib/vibe-sort').then(({ vibeSort }) => {
-    vibeSort(playlistId).catch(() => {});
+  // Auto-sort playlist tracks according to configured sort mode (fire-and-forget)
+  import('@/lib/playlist-sort').then(({ sortPlaylistTracks }) => {
+    sortPlaylistTracks(playlistId).catch(() => {});
   });
 
   // Auto-like: check if other members already have this track saved in their library

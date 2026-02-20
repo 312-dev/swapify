@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers, playlistTracks } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { getPlaylistItems, getPlaylistDetails } from '@/lib/spotify';
+import { getPlaylistItems, getPlaylistDetails, TokenInvalidError } from '@/lib/spotify';
 import { generateId } from '@/lib/utils';
 
 // POST /api/playlists/[playlistId]/tracks/sync — sync playlist items from Spotify
@@ -30,10 +30,22 @@ export async function POST(
   }
 
   // Fetch playlist metadata + items from Spotify in parallel
-  const [spotifyDetails, spotifyItems] = await Promise.all([
-    getPlaylistDetails(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
-    getPlaylistItems(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
-  ]);
+  let spotifyDetails;
+  let spotifyItems;
+  try {
+    [spotifyDetails, spotifyItems] = await Promise.all([
+      getPlaylistDetails(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
+      getPlaylistItems(playlist.ownerId, playlist.circleId, playlist.spotifyPlaylistId),
+    ]);
+  } catch (err) {
+    if (err instanceof TokenInvalidError) {
+      return NextResponse.json(
+        { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
+        { status: 401 }
+      );
+    }
+    throw err;
+  }
 
   // Check if metadata changed on Spotify and update local DB
   const metadataChanges: { name?: string; description?: string | null; imageUrl?: string | null } =
@@ -99,10 +111,10 @@ export async function POST(
     }
   }
 
-  // Auto-sort playlist by vibe if tracks changed (fire-and-forget)
+  // Auto-sort playlist tracks if tracks changed (fire-and-forget)
   if (added > 0 || removed > 0) {
-    import('@/lib/vibe-sort').then(({ vibeSort }) => {
-      vibeSort(playlistId).catch(() => {});
+    import('@/lib/playlist-sort').then(({ sortPlaylistTracks }) => {
+      sortPlaylistTracks(playlistId).catch(() => {});
     });
   }
 

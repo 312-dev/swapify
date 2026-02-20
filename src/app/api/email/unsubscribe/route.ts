@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   return new NextResponse(
     `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Unsubscribed</title></head>
-<body style="background:#0a0a0a;color:#ededed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:center;padding:80px 20px;">
+<body style="background:#0a0a0a;color:#ededed;font-family:'Epilogue',-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:80px 20px;">
   <h1 style="color:#38BDF8;">Swapify</h1>
   <p>You have been unsubscribed from email notifications.</p>
   <p style="color:#666;margin-top:16px;">You can re-enable email notifications in your Swapify profile settings.</p>

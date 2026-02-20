@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { vibeSort } from '@/lib/vibe-sort';
+import { sortPlaylistTracks } from '@/lib/playlist-sort';
 
 // POST /api/playlists/[playlistId]/tracks/sort-by-vibe — reorder tracks by vibe (exciting -> calm)
 export async function POST(
@@ -32,7 +32,7 @@ export async function POST(
     return NextResponse.json({ error: 'Only the playlist owner can sort tracks' }, { status: 403 });
   }
 
-  await vibeSort(playlistId);
+  await sortPlaylistTracks(playlistId);
 
   return NextResponse.json({ success: true });
 }

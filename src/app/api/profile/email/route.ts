@@ -33,7 +33,9 @@ export async function POST(request: Request) {
       email,
       'Confirm your email',
       'Click the link below to confirm your email address for Swapify.',
-      verifyUrl
+      verifyUrl,
+      undefined,
+      'Verify Email'
     );
   } catch {
     return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });

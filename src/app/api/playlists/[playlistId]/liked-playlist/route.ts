@@ -3,7 +3,12 @@ import { requireAuth } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers, playlistTracks, trackReactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { createPlaylist, addItemsToPlaylist, getPlaylistDetails } from '@/lib/spotify';
+import {
+  createPlaylist,
+  addItemsToPlaylist,
+  getPlaylistDetails,
+  TokenInvalidError,
+} from '@/lib/spotify';
 
 // POST /api/playlists/[playlistId]/liked-playlist — create or sync liked Spotify playlist
 export async function POST(
@@ -47,13 +52,24 @@ export async function POST(
   }
 
   // Create new Spotify playlist under this user's account
-  const spotifyPlaylist = await createPlaylist(
-    user.id,
-    playlist.circleId,
-    `${playlist.name} Likes`,
-    `Tracks I liked from ${playlist.name} on Swapify`,
-    { collaborative: false }
-  );
+  let spotifyPlaylist;
+  try {
+    spotifyPlaylist = await createPlaylist(
+      user.id,
+      playlist.circleId,
+      `${playlist.name} Likes`,
+      `Tracks I liked from ${playlist.name} on Swapify`,
+      { collaborative: false }
+    );
+  } catch (err) {
+    if (err instanceof TokenInvalidError) {
+      return NextResponse.json(
+        { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
+        { status: 401 }
+      );
+    }
+    throw err;
+  }
 
   // Store on membership
   await db
@@ -81,13 +97,23 @@ export async function POST(
       ),
     ];
     if (uris.length > 0) {
-      for (let i = 0; i < uris.length; i += 100) {
-        await addItemsToPlaylist(
-          user.id,
-          playlist.circleId,
-          spotifyPlaylist.id,
-          uris.slice(i, i + 100)
-        );
+      try {
+        for (let i = 0; i < uris.length; i += 100) {
+          await addItemsToPlaylist(
+            user.id,
+            playlist.circleId,
+            spotifyPlaylist.id,
+            uris.slice(i, i + 100)
+          );
+        }
+      } catch (err) {
+        if (err instanceof TokenInvalidError) {
+          return NextResponse.json(
+            { error: 'Your Spotify session has expired. Please reconnect.', needsReauth: true },
+            { status: 401 }
+          );
+        }
+        throw err;
       }
     }
   }
