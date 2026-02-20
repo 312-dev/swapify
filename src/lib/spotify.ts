@@ -203,7 +203,7 @@ export async function createPlaylist(
     method: 'POST',
     body: JSON.stringify({
       name,
-      description: description || 'A Swapify collaborative playlist',
+      description: description || 'A Swapify shared playlist — songs in, listens out',
       public: false,
       collaborative,
     }),

@@ -32,7 +32,7 @@ const TOUR_STEPS: TourStep[] = [
     target: 'circle-switcher',
     title: 'Your Circle',
     description:
-      'A Circle is your group of friends who share music together. Everyone in a Circle can create and join Swaplists.',
+      'A Circle is your friend group. Everyone in a Circle shares a musical mailbox — drop songs in, listen, react.',
     icon: <Users className="w-6 h-6 text-brand" />,
     position: 'below',
   },
@@ -40,7 +40,7 @@ const TOUR_STEPS: TourStep[] = [
     target: 'create-swaplist',
     title: 'Create a Swaplist',
     description:
-      "Tap here to create a shared playlist. Everyone in your Circle can add tracks, and you'll swipe to react to each other's picks.",
+      'Tap here to start a new Swaplist. Friends drop songs in, everyone listens, and the queue clears itself.',
     icon: <PlusCircle className="w-6 h-6 text-brand" />,
     position: 'below',
   },
@@ -48,7 +48,7 @@ const TOUR_STEPS: TourStep[] = [
     target: 'bottom-nav',
     title: 'Navigate Swapify',
     description:
-      'Swaplists live here on the home tab. Check Activity to see what friends are listening to, and Profile for your settings.',
+      'Your Swaplists live on the home tab. Check Activity to see what friends are playing, and Profile for your settings.',
     icon: <LayoutGrid className="w-6 h-6 text-brand" />,
     position: 'above',
   },
@@ -56,7 +56,7 @@ const TOUR_STEPS: TourStep[] = [
     target: null,
     title: "You're all set!",
     description:
-      'Start by creating your first Swaplist and inviting friends to join. Happy swapping!',
+      'Create your first Swaplist, invite friends, and start filling the mailbox. Happy swapping!',
     icon: <Sparkles className="w-6 h-6 text-accent-green" />,
   },
 ];

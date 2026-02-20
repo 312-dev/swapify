@@ -223,7 +223,7 @@ export default function TrackCard({
             />
           </svg>
           <span
-            className={`absolute inset-0 flex items-center justify-center text-[9px] font-semibold ${isComplete ? 'text-brand' : 'text-text-tertiary'}`}
+            className={`absolute inset-0 flex items-center justify-center text-[10px] font-semibold ${isComplete ? 'text-brand' : 'text-text-tertiary'}`}
           >
             {isComplete ? '\u2713' : `${track.listenedCount}/${track.totalRequired}`}
           </span>

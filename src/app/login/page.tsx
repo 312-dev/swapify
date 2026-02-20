@@ -31,7 +31,7 @@ export default async function LoginPage({
       </div>
 
       <p className="text-text-secondary text-center mb-8 max-w-xs" style={{ textWrap: 'balance' }}>
-        Connect your Spotify account to create and join collaborative playlists.
+        Connect your Spotify to start swapping songs with friends.
       </p>
 
       {error && (

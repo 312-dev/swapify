@@ -56,7 +56,7 @@ export async function POST(
   await sendEmail(
     email,
     `You're invited to join "${circle.name}"`,
-    `${user.displayName} invited you to join their circle "<strong>${circle.name}</strong>" on Swapify. Once you join, you'll see all their shared playlists and can start swapping music together.`,
+    `${user.displayName} invited you to join their circle "<strong>${circle.name}</strong>" on Swapify. Jump in, drop some songs, and start listening together.`,
     inviteUrl
   );
 

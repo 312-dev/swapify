@@ -78,7 +78,7 @@ export default function ActivityClient() {
     <div className="min-h-screen">
       <div className="px-5 pt-8 pb-4">
         <h1 className="text-3xl font-bold text-text-primary">Activity</h1>
-        <p className="text-base text-text-tertiary mt-1">Recent updates across your Swaplists</p>
+        <p className="text-base text-text-secondary mt-1">Recent updates across your Swaplists</p>
       </div>
 
       {loading ? (
@@ -113,7 +113,7 @@ export default function ActivityClient() {
         <div className="px-4">
           {grouped.map((group) => (
             <div key={group.label} className="mb-6">
-              <h3 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider px-1 mb-2">
+              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider px-1 mb-2">
                 {group.label}
               </h3>
               <div className="space-y-1">

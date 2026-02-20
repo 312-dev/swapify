@@ -1,7 +1,7 @@
 {
   "name": "Swapify",
   "short_name": "Swapify",
-  "description": "A shared music inbox for you and your friends",
+  "description": "A shared playlist that clears as you listen",
   "id": "/dashboard",
   "start_url": "/dashboard",
   "scope": "/",
