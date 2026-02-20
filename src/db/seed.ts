@@ -301,7 +301,7 @@ async function getAccessToken(): Promise<string | null> {
 async function getExistingSpotifyUris(accessToken: string): Promise<Set<string>> {
   const existingUris = new Set<string>();
   let url: string | null =
-    `${SPOTIFY_API}/playlists/${spotifyPlaylistId}/tracks?limit=50&fields=items(track(uri)),next`;
+    `${SPOTIFY_API}/playlists/${spotifyPlaylistId}/items?limit=50&fields=items(item(uri)),next`;
 
   while (url) {
     const res: Response = await fetch(url, {
@@ -313,7 +313,7 @@ async function getExistingSpotifyUris(accessToken: string): Promise<Set<string>>
     }
     const data = await res.json();
     for (const item of data.items) {
-      if (item.track?.uri) existingUris.add(item.track.uri);
+      if (item.item?.uri) existingUris.add(item.item.uri);
     }
     url = data.next;
   }
@@ -355,7 +355,7 @@ async function addTrack(
 
   // 2. Add to Spotify playlist if missing
   if (!existingSpotifyUris.has(track.uri)) {
-    const addRes = await fetch(`${SPOTIFY_API}/playlists/${spotifyPlaylistId}/tracks`, {
+    const addRes = await fetch(`${SPOTIFY_API}/playlists/${spotifyPlaylistId}/items`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -377,7 +377,7 @@ async function addTrack(
     if (memberId !== myUserId) continue;
 
     try {
-      const res = await fetch(`${SPOTIFY_API}/me/tracks/contains?ids=${track.id}`, {
+      const res = await fetch(`${SPOTIFY_API}/me/library/contains?uris=spotify:track:${track.id}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) continue;

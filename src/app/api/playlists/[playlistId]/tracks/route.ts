@@ -61,7 +61,7 @@ export async function GET(
         playlist.circleId,
         playlist.spotifyPlaylistId
       );
-      const spotifyOrder = new Map(spotifyItems.map((item, i) => [item.track.uri, i]));
+      const spotifyOrder = new Map(spotifyItems.map((item, i) => [item.item.uri, i]));
       tracks = [...dbTracks].sort((a, b) => {
         const posA = spotifyOrder.get(a.spotifyTrackUri) ?? Infinity;
         const posB = spotifyOrder.get(b.spotifyTrackUri) ?? Infinity;

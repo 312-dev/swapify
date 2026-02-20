@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         targetSpotifyPlaylistId = spotifyPlaylist.id;
 
         // Copy tracks in batches of 100
-        const uris = sourceTracks.map((item) => item.track.uri);
+        const uris = sourceTracks.map((item) => item.item.uri);
         for (let i = 0; i < uris.length; i += 100) {
           await addItemsToPlaylist(
             user.id,
@@ -138,6 +138,23 @@ export async function POST(request: NextRequest) {
             targetSpotifyPlaylistId,
             uris.slice(i, i + 100)
           );
+        }
+
+        // Copy cover image from source playlist
+        if (sourceDetails.imageUrl) {
+          try {
+            const imgRes = await fetch(sourceDetails.imageUrl);
+            if (imgRes.ok) {
+              const imgBuffer = await imgRes.arrayBuffer();
+              const base64 = Buffer.from(imgBuffer).toString('base64');
+              // Spotify accepts up to 256KB base64 JPEG
+              if (base64.length <= 256 * 1024) {
+                await uploadPlaylistImage(user.id, circleId, targetSpotifyPlaylistId, base64);
+              }
+            }
+          } catch {
+            // Non-critical — playlist will use Spotify's auto-generated mosaic
+          }
         }
 
         playlistName = newName;
@@ -172,13 +189,13 @@ export async function POST(request: NextRequest) {
           sourceTracks.map((item) => ({
             id: generateId(),
             playlistId,
-            spotifyTrackUri: item.track.uri,
-            spotifyTrackId: item.track.id,
-            trackName: item.track.name,
-            artistName: item.track.artists.map((a) => a.name).join(', '),
-            albumName: item.track.album?.name || null,
-            albumImageUrl: item.track.album?.images?.[0]?.url || null,
-            durationMs: item.track.duration_ms || null,
+            spotifyTrackUri: item.item.uri,
+            spotifyTrackId: item.item.id,
+            trackName: item.item.name,
+            artistName: item.item.artists.map((a) => a.name).join(', '),
+            albumName: item.item.album?.name || null,
+            albumImageUrl: item.item.album?.images?.[0]?.url || null,
+            durationMs: item.item.duration_ms || null,
             addedByUserId: user.id,
           }))
         );

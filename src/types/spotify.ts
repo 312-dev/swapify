@@ -22,7 +22,7 @@ export interface SpotifyTrack {
 export interface SpotifyPlaylistItem {
   added_at: string;
   added_by: { id: string; uri: string; external_urls: { spotify: string } };
-  track: SpotifyTrack;
+  item: SpotifyTrack;
 }
 
 export interface SpotifyRecentlyPlayedItem {
@@ -65,7 +65,7 @@ export interface SpotifyUserPlaylistItem {
   collaborative: boolean;
   public: boolean;
   images: Array<{ url: string; height: number | null; width: number | null }>;
-  tracks: { total: number };
+  items: { total: number };
   owner: { id: string; display_name: string };
   external_urls: { spotify: string };
 }

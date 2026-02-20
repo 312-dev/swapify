@@ -54,7 +54,9 @@ export async function POST(
   if (spotifyDetails.name !== playlist.name) {
     metadataChanges.name = spotifyDetails.name;
   }
-  if (spotifyDetails.description !== playlist.description) {
+  // Only overwrite description if Spotify has a non-empty value that differs
+  // (prevents Spotify's delayed processing from nulling out a just-set description)
+  if (spotifyDetails.description && spotifyDetails.description !== playlist.description) {
     metadataChanges.description = spotifyDetails.description;
   }
   // Always prefer Spotify's CDN URL over a local data URL
@@ -72,12 +74,12 @@ export async function POST(
   });
 
   const localTrackUris = new Set(localTracks.map((t) => t.spotifyTrackUri));
-  const spotifyTrackUris = new Set(spotifyItems.map((i) => i.track.uri));
+  const spotifyTrackUris = new Set(spotifyItems.map((i) => i.item.uri));
 
   // Add tracks that are on Spotify but not in our DB
   let added = 0;
   for (const spotifyItem of spotifyItems) {
-    const track = spotifyItem.track;
+    const track = spotifyItem.item;
     if (localTrackUris.has(track.uri)) continue;
 
     try {

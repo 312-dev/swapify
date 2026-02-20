@@ -131,7 +131,7 @@ export function mockSpotifyTrack(overrides: Record<string, unknown> = {}) {
 
 export function mockSpotifyPlaylistItem(overrides: Record<string, unknown> = {}) {
   return {
-    track: mockSpotifyTrack(),
+    item: mockSpotifyTrack(),
     added_at: new Date().toISOString(),
     added_by: { id: 'spotify-user-1' },
     ...overrides,

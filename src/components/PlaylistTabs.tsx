@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import { springs } from '@/lib/motion';
-import { ThumbsUp } from 'lucide-react';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 
 function ShareSongIcon({ className }: { className?: string }) {
   return (
@@ -63,9 +63,10 @@ export default function PlaylistTabs({
                 transition={springs.snappy}
               />
             )}
-            <span className="relative z-10 inline-flex items-center gap-1.5">
-              {isInbox && <ShareSongIcon className="w-3.5 h-3.5" />}
-              {tab.id === 'liked' && <ThumbsUp className="w-3.5 h-3.5" />}
+            <span className="relative z-10 inline-flex items-center justify-center gap-1.5">
+              {isInbox && <ShareSongIcon className="w-3.5 h-3.5 shrink-0" />}
+              {tab.id === 'liked' && <ThumbsUp className="w-3.5 h-3.5 shrink-0" />}
+              {tab.id === 'outcasts' && <ThumbsDown className="w-3.5 h-3.5 shrink-0" />}
               {tab.label}
               {isInbox && count > 0 && (
                 <span className="inline-flex items-center justify-center min-w-4.5 h-4.5 px-1 text-[11px] font-bold rounded-full bg-brand text-black leading-none">

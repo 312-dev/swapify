@@ -812,7 +812,7 @@ async function auditPlaylist(
   });
   const localTrackUris = new Set(localTracks.map((t) => t.spotifyTrackUri));
 
-  const externalItems = spotifyItems.filter((item) => !localTrackUris.has(item.track.uri));
+  const externalItems = spotifyItems.filter((item) => !localTrackUris.has(item.item.uri));
 
   if (externalItems.length === 0) return;
 
@@ -828,7 +828,7 @@ async function auditPlaylist(
 
     if (!appUser) {
       // Non-registered user — remove silently
-      urisToRemove.push(spotifyItem.track.uri);
+      urisToRemove.push(spotifyItem.item.uri);
       counters.unauthorizedRemoved++;
       continue;
     }
@@ -836,7 +836,7 @@ async function auditPlaylist(
     const memberOfPlaylist = await isPlaylistMember(playlistId, appUser.id);
     if (!memberOfPlaylist) {
       // Not a member of this playlist — remove silently
-      urisToRemove.push(spotifyItem.track.uri);
+      urisToRemove.push(spotifyItem.item.uri);
       counters.unauthorizedRemoved++;
       continue;
     }
@@ -846,7 +846,7 @@ async function auditPlaylist(
       const activeCount = localTracks.filter((t) => t.addedByUserId === appUser.id).length;
 
       if (activeCount >= playlist.maxTracksPerUser) {
-        urisToRemove.push(spotifyItem.track.uri);
+        urisToRemove.push(spotifyItem.item.uri);
         counters.overLimitRemoved++;
 
         // Notify via both push + email, respecting granular prefs
@@ -855,7 +855,7 @@ async function auditPlaylist(
             appUser.id,
             {
               title: 'Track removed',
-              body: `Your track "${spotifyItem.track.name}" by ${spotifyItem.track.artists.map((a) => a.name).join(', ')} was removed from "${playlist.name}" because you've reached the limit of ${playlist.maxTracksPerUser} active track${playlist.maxTracksPerUser === 1 ? '' : 's'} per member.`,
+              body: `Your track "${spotifyItem.item.name}" by ${spotifyItem.item.artists.map((a) => a.name).join(', ')} was removed from "${playlist.name}" because you've reached the limit of ${playlist.maxTracksPerUser} active track${playlist.maxTracksPerUser === 1 ? '' : 's'} per member.`,
               url: `${process.env.NEXT_PUBLIC_APP_URL}/playlist/${playlistId}`,
             },
             'trackRemoved'
@@ -870,13 +870,13 @@ async function auditPlaylist(
       await db.insert(playlistTracks).values({
         id: generateId(),
         playlistId,
-        spotifyTrackUri: spotifyItem.track.uri,
-        spotifyTrackId: spotifyItem.track.id,
-        trackName: spotifyItem.track.name,
-        artistName: spotifyItem.track.artists.map((a) => a.name).join(', '),
-        albumName: spotifyItem.track.album?.name || null,
-        albumImageUrl: spotifyItem.track.album?.images?.[0]?.url || null,
-        durationMs: spotifyItem.track.duration_ms || null,
+        spotifyTrackUri: spotifyItem.item.uri,
+        spotifyTrackId: spotifyItem.item.id,
+        trackName: spotifyItem.item.name,
+        artistName: spotifyItem.item.artists.map((a) => a.name).join(', '),
+        albumName: spotifyItem.item.album?.name || null,
+        albumImageUrl: spotifyItem.item.album?.images?.[0]?.url || null,
+        durationMs: spotifyItem.item.duration_ms || null,
         addedByUserId: appUser.id,
       });
       adopted++;
@@ -957,7 +957,7 @@ export async function syncLikedPlaylist(
     throw error;
   }
 
-  const spotifyUris = new Set(spotifyItems.map((item) => item.track.uri));
+  const spotifyUris = new Set(spotifyItems.map((item) => item.item.uri));
 
   // Diff
   const toAdd = [...desiredUris].filter((uri) => !spotifyUris.has(uri));

@@ -34,7 +34,7 @@ export async function GET() {
         name: p.name,
         description: p.description,
         imageUrl: p.images?.[0]?.url || null,
-        trackCount: p.tracks?.total ?? 0,
+        trackCount: p.items?.total ?? 0,
         collaborative: p.collaborative,
         isPublic: p.public,
         ownerId: p.owner.id,

@@ -314,7 +314,7 @@ export async function getPlaylistDetails(
   const res = await spotifyFetch(
     userId,
     circleId,
-    `/playlists/${playlistId}?fields=name,description,images,tracks.total,collaborative,public`
+    `/playlists/${playlistId}?fields=name,description,images,items.total,collaborative,public`
   );
   if (!res.ok) {
     const err = await res.text();
@@ -324,7 +324,7 @@ export async function getPlaylistDetails(
     name: string;
     description: string | null;
     images: Array<{ url: string }>;
-    tracks: { total: number };
+    items: { total: number };
     collaborative: boolean;
     public: boolean;
   } = await res.json();
@@ -332,7 +332,7 @@ export async function getPlaylistDetails(
     name: data.name,
     description: data.description || null,
     imageUrl: data.images?.[0]?.url || null,
-    trackCount: data.tracks?.total ?? 0,
+    trackCount: data.items?.total ?? 0,
     collaborative: data.collaborative,
     isPublic: data.public,
   };
@@ -353,7 +353,7 @@ export async function getPlaylistItems(
       throw new Error(`Failed to get playlist items: ${res.status} ${err}`);
     }
     const data: { items: SpotifyPlaylistItem[]; next: string | null } = await res.json();
-    allItems.push(...data.items.filter((i) => i.track));
+    allItems.push(...data.items.filter((i) => i.item));
     // next is a full URL, extract the path
     if (data.next) {
       url = data.next.replace('https://api.spotify.com/v1', '');
@@ -420,7 +420,7 @@ export async function removeItemsFromPlaylist(
   const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/items`, {
     method: 'DELETE',
     body: JSON.stringify({
-      tracks: uris.map((uri) => ({ uri })),
+      items: uris.map((uri) => ({ uri })),
     }),
   });
   if (!res.ok) {
@@ -510,7 +510,8 @@ export async function checkSavedTracks(
   circleId: string,
   trackIds: string[]
 ): Promise<boolean[]> {
-  const res = await spotifyFetch(userId, circleId, `/me/tracks/contains?ids=${trackIds.join(',')}`);
+  const uris = trackIds.map((id) => `spotify:track:${id}`);
+  const res = await spotifyFetch(userId, circleId, `/me/library/contains?uris=${uris.join(',')}`);
   if (!res.ok) {
     throw new Error(`Failed to check saved tracks: ${res.status}`);
   }
@@ -522,9 +523,10 @@ export async function saveTracks(
   circleId: string,
   trackIds: string[]
 ): Promise<void> {
-  const res = await spotifyFetch(userId, circleId, '/me/tracks', {
+  const uris = trackIds.map((id) => `spotify:track:${id}`);
+  const res = await spotifyFetch(userId, circleId, '/me/library', {
     method: 'PUT',
-    body: JSON.stringify({ ids: trackIds }),
+    body: JSON.stringify({ uris }),
   });
   if (!res.ok) {
     throw new Error(`Failed to save tracks: ${res.status}`);
@@ -536,9 +538,10 @@ export async function removeSavedTracks(
   circleId: string,
   trackIds: string[]
 ): Promise<void> {
-  const res = await spotifyFetch(userId, circleId, '/me/tracks', {
+  const uris = trackIds.map((id) => `spotify:track:${id}`);
+  const res = await spotifyFetch(userId, circleId, '/me/library', {
     method: 'DELETE',
-    body: JSON.stringify({ ids: trackIds }),
+    body: JSON.stringify({ uris }),
   });
   if (!res.ok) {
     throw new Error(`Failed to remove tracks: ${res.status}`);
@@ -553,7 +556,7 @@ export async function reorderPlaylistTracks(
   playlistId: string,
   uris: string[]
 ): Promise<{ snapshot_id: string }> {
-  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/tracks`, {
+  const res = await spotifyFetch(userId, circleId, `/playlists/${playlistId}/items`, {
     method: 'PUT',
     body: JSON.stringify({ uris }),
   });

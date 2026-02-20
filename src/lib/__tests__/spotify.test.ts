@@ -256,7 +256,7 @@ describe('getPlaylistItems', () => {
   it('returns items from a single page', async () => {
     const items = await getPlaylistItems('user-1', 'circle-1', 'playlist-1');
     expect(items).toHaveLength(1);
-    expect(items[0]!.track.id).toBe('track-1');
+    expect(items[0]!.item.id).toBe('track-1');
   });
 
   it('handles pagination by following next URLs', async () => {
@@ -272,7 +272,7 @@ describe('getPlaylistItems', () => {
               {
                 added_at: new Date().toISOString(),
                 added_by: { id: 'user-1', uri: '', external_urls: { spotify: '' } },
-                track: { ...mockTrack, id: 'track-page1', name: 'Page 1 Track' },
+                item: { ...mockTrack, id: 'track-page1', name: 'Page 1 Track' },
               },
             ],
             next: `${SPOTIFY_API}/playlists/playlist-1/items?page2=true`,
@@ -284,7 +284,7 @@ describe('getPlaylistItems', () => {
             {
               added_at: new Date().toISOString(),
               added_by: { id: 'user-1', uri: '', external_urls: { spotify: '' } },
-              track: { ...mockTrack, id: 'track-page2', name: 'Page 2 Track' },
+              item: { ...mockTrack, id: 'track-page2', name: 'Page 2 Track' },
             },
           ],
           next: null,
@@ -294,8 +294,8 @@ describe('getPlaylistItems', () => {
 
     const items = await getPlaylistItems('user-1', 'circle-1', 'playlist-1');
     expect(items).toHaveLength(2);
-    expect(items[0]!.track.id).toBe('track-page1');
-    expect(items[1]!.track.id).toBe('track-page2');
+    expect(items[0]!.item.id).toBe('track-page1');
+    expect(items[1]!.item.id).toBe('track-page2');
     expect(callCount).toBe(2);
   });
 });
@@ -339,7 +339,7 @@ describe('removeItemsFromPlaylist', () => {
     ]);
     expect(result.snapshot_id).toBe('snap-del');
     expect(capturedBody).toEqual({
-      tracks: [{ uri: 'spotify:track:x' }, { uri: 'spotify:track:y' }],
+      items: [{ uri: 'spotify:track:x' }, { uri: 'spotify:track:y' }],
     });
   });
 });
@@ -446,7 +446,7 @@ describe('reorderPlaylistTracks', () => {
   it('sends URIs and returns snapshot_id', async () => {
     let capturedBody: Record<string, unknown> | null = null;
     server.use(
-      http.put(`${SPOTIFY_API}/playlists/:id/tracks`, async ({ request }) => {
+      http.put(`${SPOTIFY_API}/playlists/:id/items`, async ({ request }) => {
         capturedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ snapshot_id: 'snap-reorder' });
       })
@@ -473,6 +473,9 @@ describe('getPlaylistDetails', () => {
       name: 'Test Playlist',
       description: 'A test playlist',
       imageUrl: 'https://img.example.com',
+      trackCount: 1,
+      collaborative: true,
+      isPublic: false,
     });
   });
 });

@@ -75,7 +75,7 @@ export const handlers = [
         {
           added_at: new Date().toISOString(),
           added_by: { id: 'user-1', uri: '', external_urls: { spotify: '' } },
-          track: mockTrack,
+          item: mockTrack,
         },
       ],
       next: null,
@@ -127,17 +127,17 @@ export const handlers = [
   }),
 
   // Check saved tracks
-  http.get(`${SPOTIFY_API}/me/tracks/contains`, () => {
+  http.get(`${SPOTIFY_API}/me/library/contains`, () => {
     return HttpResponse.json([true, false]);
   }),
 
   // Save tracks
-  http.put(`${SPOTIFY_API}/me/tracks`, () => {
+  http.put(`${SPOTIFY_API}/me/library`, () => {
     return new HttpResponse(null, { status: 200 });
   }),
 
   // Remove saved tracks
-  http.delete(`${SPOTIFY_API}/me/tracks`, () => {
+  http.delete(`${SPOTIFY_API}/me/library`, () => {
     return new HttpResponse(null, { status: 200 });
   }),
 
@@ -147,6 +147,9 @@ export const handlers = [
       name: 'Test Playlist',
       description: 'A test playlist',
       images: [{ url: 'https://img.example.com' }],
+      items: { total: 1 },
+      collaborative: true,
+      public: false,
     });
   }),
 
@@ -161,7 +164,7 @@ export const handlers = [
   }),
 
   // Reorder tracks
-  http.put(`${SPOTIFY_API}/playlists/:id/tracks`, () => {
+  http.put(`${SPOTIFY_API}/playlists/:id/items`, () => {
     return HttpResponse.json({ snapshot_id: 'snap-reorder' });
   }),
 ];
