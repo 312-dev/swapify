@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, getSession } from '@/lib/auth';
 import { db } from '@/db';
-import { circles, circleMembers } from '@/db/schema';
+import { circles, circleMembers, playlists } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 // GET /api/circles/[circleId] — get circle details
@@ -150,6 +150,9 @@ export async function DELETE(
   if (circle.hostUserId !== user.id) {
     return NextResponse.json({ error: 'Not the host' }, { status: 403 });
   }
+
+  // Delete playlists in this circle first (no cascade on playlists.circleId)
+  await db.delete(playlists).where(eq(playlists.circleId, circleId));
 
   // Cascade delete handles circle_members (ON DELETE CASCADE)
   await db.delete(circles).where(eq(circles.id, circleId));

@@ -14,6 +14,10 @@ interface CirclePreview {
   spotifyClientId: string;
 }
 
+interface InvitePreview extends CirclePreview {
+  recipientEmail?: string;
+}
+
 export default function JoinCirclePage() {
   return (
     <Suspense>
@@ -26,19 +30,23 @@ function JoinCircleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const codeParam = searchParams.get('code');
+  const inviteParam = searchParams.get('invite');
 
   const [code, setCode] = useState(codeParam || '');
-  const [preview, setPreview] = useState<CirclePreview | null>(null);
+  const [inviteToken, setInviteToken] = useState(inviteParam || '');
+  const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-lookup when code param is present
+  // Auto-lookup when code or invite param is present
   useEffect(() => {
-    if (codeParam) {
+    if (inviteParam) {
+      lookupInvite(inviteParam);
+    } else if (codeParam) {
       lookupCode(codeParam);
     }
-  }, [codeParam]);
+  }, [codeParam, inviteParam]);
 
   async function lookupCode(inviteCode: string) {
     setIsLoading(true);
@@ -60,6 +68,26 @@ function JoinCircleContent() {
     }
   }
 
+  async function lookupInvite(token: string) {
+    setIsLoading(true);
+    setError(null);
+    setPreview(null);
+    try {
+      const res = await fetch(`/api/circles/resolve-invite?token=${encodeURIComponent(token)}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Invalid invite link');
+      }
+      const data: InvitePreview = await res.json();
+      setPreview(data);
+      setInviteToken(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid invite link');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   function handleJoin() {
     if (!preview) return;
     setIsJoining(true);
@@ -67,23 +95,28 @@ function JoinCircleContent() {
     // Joining a circle ALWAYS requires OAuth with the circle's Spotify client ID,
     // even if the user is already logged in. The OAuth callback handles creating
     // the circle_members entry.
-    const loginUrl =
+    let loginUrl =
       `/api/auth/login?clientId=${encodeURIComponent(preview.spotifyClientId)}` +
       `&circleAction=join` +
       `&circleId=${encodeURIComponent(preview.id)}` +
       `&returnTo=${encodeURIComponent('/dashboard')}`;
 
+    // Pass invite token for email auto-verify
+    if (inviteToken) {
+      loginUrl += `&inviteToken=${encodeURIComponent(inviteToken)}`;
+    }
+
     window.location.href = loginUrl;
   }
 
   return (
-    <main className="gradient-bg min-h-screen flex flex-col items-center justify-center px-5 py-6">
+    <main className="gradient-bg min-h-screen flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-md">
         <m.h1
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={springs.gentle}
-          className="text-3xl font-bold text-text-primary text-center mb-6"
+          className="text-2xl font-bold text-text-primary text-center mb-8"
         >
           Join a Circle
         </m.h1>
@@ -145,7 +178,7 @@ function JoinCircleContent() {
                   className="input-glass flex-1"
                 />
                 <button
-                  onClick={() => lookupCode(code)}
+                  onClick={() => lookupCode(code.trim())}
                   disabled={!code.trim() || isLoading}
                   className="btn-pill btn-pill-primary disabled:opacity-50"
                 >
@@ -182,9 +215,9 @@ function JoinCircleContent() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={springs.gentle}
-            className="space-y-4"
+            className="space-y-6"
           >
-            <div className="glass rounded-xl p-6 text-center">
+            <div className="glass rounded-xl p-8 text-center">
               {/* Circle icon */}
               <m.div
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -210,7 +243,7 @@ function JoinCircleContent() {
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ...springs.gentle, delay: STAGGER_DELAY * 3 }}
-                className="flex items-center justify-center gap-2 text-base text-text-secondary mb-4"
+                className="flex items-center justify-center gap-2 text-sm text-text-secondary mb-5"
               >
                 <span className="inline-flex items-center gap-1">
                   <Crown className="w-3.5 h-3.5 text-brand" />
@@ -222,6 +255,19 @@ function JoinCircleContent() {
                 </span>
               </m.div>
 
+              {/* Invited email */}
+              {preview.recipientEmail && (
+                <m.p
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springs.gentle, delay: STAGGER_DELAY * 3.5 }}
+                  className="text-xs text-text-secondary mb-4"
+                >
+                  Invited as{' '}
+                  <span className="font-medium text-text-primary">{preview.recipientEmail}</span>
+                </m.p>
+              )}
+
               {/* Join button */}
               <m.div
                 initial={{ opacity: 0, y: 4 }}
@@ -231,7 +277,7 @@ function JoinCircleContent() {
                 <button
                   onClick={handleJoin}
                   disabled={isJoining}
-                  className="btn-pill w-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="btn-pill w-full bg-accent-green hover:bg-accent-green/90 text-black font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isJoining ? (
                     <>
@@ -282,7 +328,7 @@ function JoinCircleContent() {
                 setCode('');
                 setError(null);
               }}
-              className="text-base text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-1.5"
+              className="text-sm text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-1.5"
             >
               <ArrowLeft className="w-4 h-4" />
               Use a different code

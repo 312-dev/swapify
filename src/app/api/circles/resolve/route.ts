@@ -10,14 +10,16 @@ export async function GET(request: NextRequest) {
   const limited = checkRateLimit(`public:${ip}`, RATE_LIMITS.public);
   if (limited) return limited;
 
-  const code = request.nextUrl.searchParams.get('code');
+  const rawCode = request.nextUrl.searchParams.get('code');
 
-  if (!code) {
+  if (!rawCode) {
     return NextResponse.json({ error: 'No code provided' }, { status: 400 });
   }
 
+  const code = rawCode.trim().toLowerCase();
+
   const circle = await db.query.circles.findFirst({
-    where: eq(circles.inviteCode, code),
+    where: sql`lower(${circles.inviteCode}) = ${code}`,
     with: {
       host: true,
     },
