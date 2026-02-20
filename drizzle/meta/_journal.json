@@ -50,6 +50,34 @@
       "when": 1771950000000,
       "tag": "0012_add_circle_image",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771960000000,
+      "tag": "0013_fix_email_verify_expires_bigint",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772000000000,
+      "tag": "0014_add_sort_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772100000000,
+      "tag": "0015_add_has_completed_tour",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772200000000,
+      "tag": "0016_add_circle_invites",
+      "breakpoints": true
     }
   ]
 }

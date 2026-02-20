@@ -25,6 +25,7 @@ export const users = pgTable('users', {
   notificationPrefs: text('notification_prefs'), // JSON: per-type channel prefs
   autoNegativeReactions: boolean('auto_negative_reactions').notNull().default(true),
   recentEmojis: text('recent_emojis'), // JSON array of last 3 custom emojis used
+  hasCompletedTour: boolean('has_completed_tour').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -64,7 +65,7 @@ export const circleMembers = pgTable(
     accessToken: text('access_token').notNull(),
     refreshToken: text('refresh_token').notNull(),
     tokenExpiresAt: integer('token_expires_at').notNull(),
-    lastPollCursor: integer('last_poll_cursor'),
+    lastPollCursor: bigint('last_poll_cursor', { mode: 'number' }),
     lastPlaybackJson: text('last_playback_json'), // JSON: { trackId, progressMs, durationMs, capturedAt }
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -90,6 +91,7 @@ export const playlists = pgTable('playlists', {
   maxTracksPerUser: integer('max_tracks_per_user'),
   maxTrackAgeDays: integer('max_track_age_days').notNull().default(7),
   removalDelay: text('removal_delay').notNull().default('immediate'),
+  sortMode: text('sort_mode').notNull().default('order_added'),
   vibeName: text('vibe_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -224,6 +226,24 @@ export const pushSubscriptions = pgTable(
   (table) => [uniqueIndex('push_sub_user_endpoint_idx').on(table.userId, table.endpoint)]
 );
 
+// ─── Circle Invites ─────────────────────────────────────────────────────────
+// Per-recipient email invite tokens for circles. Auto-verifies email on accept.
+export const circleInvites = pgTable('circle_invites', {
+  id: text('id').primaryKey(),
+  circleId: text('circle_id')
+    .notNull()
+    .references(() => circles.id, { onDelete: 'cascade' }),
+  senderUserId: text('sender_user_id')
+    .notNull()
+    .references(() => users.id),
+  recipientEmail: text('recipient_email').notNull(),
+  inviteToken: text('invite_token').notNull().unique(),
+  expiresAt: bigint('expires_at', { mode: 'number' }).notNull(), // unix ms
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  usedByUserId: text('used_by_user_id').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   ownedPlaylists: many(playlists),
@@ -235,12 +255,14 @@ export const usersRelations = relations(users, ({ many }) => ({
   reactions: many(trackReactions),
   pushSubscriptions: many(pushSubscriptions),
   sentInvites: many(emailInvites),
+  sentCircleInvites: many(circleInvites),
 }));
 
 export const circlesRelations = relations(circles, ({ one, many }) => ({
   host: one(users, { fields: [circles.hostUserId], references: [users.id] }),
   members: many(circleMembers),
   playlists: many(playlists),
+  invites: many(circleInvites),
 }));
 
 export const circleMembersRelations = relations(circleMembers, ({ one }) => ({
@@ -292,4 +314,9 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
     fields: [pushSubscriptions.userId],
     references: [users.id],
   }),
+}));
+
+export const circleInvitesRelations = relations(circleInvites, ({ one }) => ({
+  circle: one(circles, { fields: [circleInvites.circleId], references: [circles.id] }),
+  sender: one(users, { fields: [circleInvites.senderUserId], references: [users.id] }),
 }));
