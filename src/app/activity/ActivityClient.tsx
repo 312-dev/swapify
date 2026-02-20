@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
 import Link from 'next/link';
 import AlbumArt from '@/components/AlbumArt';
+import { useUnreadActivity } from '@/components/UnreadActivityProvider';
 
 interface ActivityEvent {
   id: string;
@@ -61,6 +62,7 @@ function groupByDate(events: ActivityEvent[]): { label: string; events: Activity
 export default function ActivityClient() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const { markRead } = useUnreadActivity();
 
   useEffect(() => {
     fetch('/api/activity')
@@ -70,7 +72,8 @@ export default function ActivityClient() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+    markRead();
+  }, [markRead]);
 
   const grouped = groupByDate(events);
 

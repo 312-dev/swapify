@@ -17,6 +17,7 @@ import OutcastTracksView from '@/components/OutcastTracksView';
 import { Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import ReauthOverlay from '@/components/ReauthOverlay';
+import { useUnreadActivity } from '@/components/UnreadActivityProvider';
 
 interface PlaylistDetailClientProps {
   playlistId: string;
@@ -139,6 +140,12 @@ export default function PlaylistDetailClient({
   const [followLoading, setFollowLoading] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
   const albumColors = useAlbumColors(currentImageUrl);
+  const { markRead } = useUnreadActivity();
+
+  // Mark this playlist's activity as read on mount
+  useEffect(() => {
+    markRead({ playlistId });
+  }, [markRead, playlistId]);
 
   const fetchTracks = useCallback(async () => {
     try {

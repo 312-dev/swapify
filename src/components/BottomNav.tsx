@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ListMusic } from 'lucide-react';
+import { useUnreadActivity } from '@/components/UnreadActivityProvider';
 
 const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist', '/circle'];
 
@@ -58,6 +59,7 @@ function getActiveTab(pathname: string): string {
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { unreadCount } = useUnreadActivity();
 
   const isAuthenticatedPath = AUTHENTICATED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
@@ -73,6 +75,7 @@ export default function BottomNav() {
       <div className="flex items-center justify-around h-16 max-w-2xl mx-auto w-full sm:justify-center sm:gap-2">
         {tabs.map(({ label, href, icon: Icon }) => {
           const isActive = activeTab === href;
+          const showBadge = href === '/activity' && unreadCount > 0;
           return (
             <Link
               key={href}
@@ -81,7 +84,14 @@ export default function BottomNav() {
                 isActive ? 'text-brand' : 'text-text-secondary'
               }`}
             >
-              <Icon />
+              <span className="relative">
+                <Icon />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white leading-none">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
               <span className="text-xs font-medium mt-1 sm:mt-0 sm:text-sm">{label}</span>
             </Link>
           );
