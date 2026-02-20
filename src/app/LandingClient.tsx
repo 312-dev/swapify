@@ -909,7 +909,7 @@ export default function LandingClient() {
           }
         }}
       >
-        <DialogContent className="bg-[var(--surface-elevated)] border-white/[0.08] backdrop-blur-2xl sm:max-w-sm">
+        <DialogContent className="bg-[var(--surface-elevated)] border-white/[0.08] backdrop-blur-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-text-primary">Sign Back In</DialogTitle>
             <DialogDescription className="sr-only">
@@ -920,28 +920,26 @@ export default function LandingClient() {
             {!signInResult ? (
               <>
                 <p className="text-sm text-text-secondary">
-                  Enter your Spotify username or verified email to find your account.
+                  Enter your Spotify username or verified email to look up your account.
                 </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={signInQuery}
-                    onChange={(e) => {
-                      setSignInQuery(e.target.value);
-                      setSignInError('');
-                    }}
-                    placeholder="Spotify username or email"
-                    className="input-glass flex-1 text-sm"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSignInLookup()}
-                  />
-                  <button
-                    onClick={handleSignInLookup}
-                    disabled={!signInQuery.trim() || isSignInLooking}
-                    className="btn-pill btn-pill-primary btn-pill-sm shrink-0 disabled:opacity-50"
-                  >
-                    {isSignInLooking ? 'Finding...' : 'Find'}
-                  </button>
-                </div>
+                <input
+                  type="text"
+                  value={signInQuery}
+                  onChange={(e) => {
+                    setSignInQuery(e.target.value);
+                    setSignInError('');
+                  }}
+                  placeholder="Spotify username or email"
+                  className="input-glass w-full"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSignInLookup()}
+                />
+                <button
+                  onClick={handleSignInLookup}
+                  disabled={!signInQuery.trim() || isSignInLooking}
+                  className="btn-pill btn-pill-primary w-full disabled:opacity-50"
+                >
+                  {isSignInLooking ? 'Looking up...' : 'Look up account'}
+                </button>
                 {signInError && <p className="text-xs text-danger mt-2">{signInError}</p>}
               </>
             ) : (
