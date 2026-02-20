@@ -73,7 +73,10 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 // Mock notifications and other side effects
-vi.mock('@/lib/notifications', () => ({ notifyPlaylistMembers: vi.fn() }));
+vi.mock('@/lib/notifications', () => ({
+  notifyPlaylistMembers: vi.fn(),
+  notifyCircleMembers: vi.fn(),
+}));
 vi.mock('@/lib/playlist-sort', () => ({ sortPlaylistTracks: vi.fn() }));
 vi.mock('@/lib/polling', () => ({ setAutoReaction: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
@@ -232,20 +235,24 @@ describe('GET /api/playlists', () => {
               },
             },
           ],
+          createdAt: new Date('2025-01-01T00:00:00Z'),
           tracks: [
             {
               spotifyTrackId: 'track-1',
               addedByUserId: 'user-2',
+              addedAt: new Date('2025-01-02T00:00:00Z'),
               removedAt: null,
             },
             {
               spotifyTrackId: 'track-2',
               addedByUserId: 'user-1',
+              addedAt: new Date('2025-01-03T00:00:00Z'),
               removedAt: null,
             },
             {
               spotifyTrackId: 'track-3',
               addedByUserId: 'user-2',
+              addedAt: new Date('2025-01-04T00:00:00Z'),
               removedAt: new Date(), // removed track
             },
           ],

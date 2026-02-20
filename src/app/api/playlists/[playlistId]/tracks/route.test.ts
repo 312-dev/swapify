@@ -36,6 +36,16 @@ vi.mock('@/lib/spotify', () => ({
       this.circleId = circleId;
     }
   },
+  SpotifyRateLimitError: class SpotifyRateLimitError extends Error {
+    path: string;
+    retryAfterSeconds: number;
+    constructor(path: string, retryAfterSeconds: number) {
+      super(`Spotify rate limit on ${path} — retry after ${retryAfterSeconds}s`);
+      this.name = 'SpotifyRateLimitError';
+      this.path = path;
+      this.retryAfterSeconds = retryAfterSeconds;
+    }
+  },
 }));
 
 vi.mock('@/lib/rate-limit', () => ({

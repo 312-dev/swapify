@@ -141,9 +141,10 @@ describe('DEFAULT_NOTIFICATION_PREFS', () => {
 });
 
 describe('NOTIFICATION_TYPES', () => {
-  it('contains all six notification types', () => {
-    expect(NOTIFICATION_TYPES).toHaveLength(6);
+  it('contains all seven notification types', () => {
+    expect(NOTIFICATION_TYPES).toHaveLength(7);
     expect(NOTIFICATION_TYPES).toContain('newTrack');
+    expect(NOTIFICATION_TYPES).toContain('newSwaplist');
     expect(NOTIFICATION_TYPES).toContain('memberJoined');
     expect(NOTIFICATION_TYPES).toContain('reactions');
     expect(NOTIFICATION_TYPES).toContain('trackRemoved');
