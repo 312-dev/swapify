@@ -45,9 +45,11 @@ export async function GET(request: NextRequest) {
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
   session.codeVerifier = codeVerifier;
   session.spotifyClientId = clientId;
+  const inviteToken = request.nextUrl.searchParams.get('inviteToken');
   if (returnTo) session.returnTo = returnTo;
   if (circleId) session.pendingCircleId = circleId;
   if (circleAction) session.pendingCircleAction = circleAction;
+  if (inviteToken) session.pendingInviteToken = inviteToken;
   await session.save();
 
   const scopes = [

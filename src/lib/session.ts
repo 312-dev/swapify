@@ -12,6 +12,7 @@ export interface SessionData {
   spotifyClientId?: string;
   pendingCircleId?: string; // Circle being joined during OAuth
   pendingCircleAction?: 'create' | 'join' | 'reauth'; // What to do in callback
+  pendingInviteToken?: string; // Email invite token for auto-verify
   returnTo?: string;
 }
 

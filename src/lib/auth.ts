@@ -31,6 +31,18 @@ export async function requireAuth() {
 }
 
 /**
+ * Require an authenticated user with a verified email.
+ * Redirects to /verify-email if the user hasn't verified their email yet.
+ */
+export async function requireVerifiedEmail() {
+  const user = await requireAuth();
+  if (!user.email) {
+    redirect('/verify-email');
+  }
+  return user;
+}
+
+/**
  * Get the current user's membership in their active circle.
  * Returns the circle_members row with the circle relation (includes spotifyClientId, name, host),
  * or null if no active circle is set or the user is not a member.
@@ -82,6 +94,9 @@ export async function getUserCircles(userId: string) {
       circle: {
         with: {
           host: true,
+          members: {
+            with: { user: true },
+          },
         },
       },
     },

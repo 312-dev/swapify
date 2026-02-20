@@ -5,7 +5,7 @@ import { SessionData, sessionOptions } from '@/lib/session';
 import { getSpotifyProfile } from '@/lib/spotify';
 import { encrypt } from '@/lib/crypto';
 import { db } from '@/db';
-import { users, circles, circleMembers } from '@/db/schema';
+import { users, circles, circleMembers, circleInvites } from '@/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { generateId, generateInviteCode } from '@/lib/utils';
 import type { SpotifyTokenResponse } from '@/types/spotify';
@@ -147,6 +147,10 @@ async function handleJoinCircle(
   if (!circle) {
     logger.error(`[Swapify] Join failed: circle ${pendingCircleId} not found`);
     return { redirectTo: '/login?error=circle_not_found' };
+  }
+
+  if (circle.hostUserId === userId) {
+    return { redirectTo: '/dashboard?error=own_circle' };
   }
 
   const currentMembers = await getCircleMemberCount(pendingCircleId);
@@ -341,7 +345,8 @@ export async function GET(request: NextRequest) {
   const tokens = encryptTokens(tokenData);
 
   // Capture transient fields before clearing
-  const { pendingCircleAction, pendingCircleId, returnTo, spotifyClientId } = session;
+  const { pendingCircleAction, pendingCircleId, returnTo, spotifyClientId, pendingInviteToken } =
+    session;
 
   // Resolve the circle based on the pending action
   const result = await resolveCircle({
@@ -359,6 +364,41 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(result.redirectTo, baseUrl));
   }
 
+  // Auto-verify email from invite token (only if user has no verified email yet)
+  if (pendingInviteToken) {
+    try {
+      const invite = await db.query.circleInvites.findFirst({
+        where: eq(circleInvites.inviteToken, pendingInviteToken),
+      });
+
+      if (invite && !invite.usedAt && invite.expiresAt >= Date.now()) {
+        // Only auto-set email if user doesn't already have one
+        const currentUser = await db.query.users.findFirst({
+          where: eq(users.id, userId),
+        });
+        if (currentUser && !currentUser.email) {
+          await db
+            .update(users)
+            .set({
+              email: invite.recipientEmail,
+              pendingEmail: null,
+              emailVerifyToken: null,
+              emailVerifyExpiresAt: null,
+            })
+            .where(eq(users.id, userId));
+        }
+
+        // Mark invite as used
+        await db
+          .update(circleInvites)
+          .set({ usedAt: new Date(), usedByUserId: userId })
+          .where(eq(circleInvites.id, invite.id));
+      }
+    } catch (err) {
+      logger.error(`[Swapify] Failed to process invite token auto-verify: ${err}`);
+    }
+  }
+
   // Set session with circle context
   session.userId = userId;
   session.spotifyId = profile.id;
@@ -372,6 +412,7 @@ export async function GET(request: NextRequest) {
   session.spotifyClientId = undefined;
   session.pendingCircleId = undefined;
   session.pendingCircleAction = undefined;
+  session.pendingInviteToken = undefined;
   session.returnTo = undefined;
   await session.save();
 
