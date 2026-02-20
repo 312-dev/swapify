@@ -79,7 +79,7 @@ export default function SpotlightTour({ onComplete }: { onComplete: () => void }
 
   const currentStep = TOUR_STEPS[step]!;
 
-  // Calculate target element rect
+  // Calculate target element rect; skip steps whose target is missing from the DOM
   const updateRect = useCallback(() => {
     if (!currentStep.target) {
       setTargetRect(null);
@@ -87,7 +87,12 @@ export default function SpotlightTour({ onComplete }: { onComplete: () => void }
     }
     const el = document.querySelector(`[data-tour="${currentStep.target}"]`);
     if (!el) {
+      // Auto-skip this step — the target element isn't in the DOM
       setTargetRect(null);
+      setStep((s) => {
+        const next = s + 1;
+        return next < TOUR_STEPS.length ? next : s;
+      });
       return;
     }
     const rect = el.getBoundingClientRect();
@@ -145,10 +150,14 @@ export default function SpotlightTour({ onComplete }: { onComplete: () => void }
       };
     }
 
-    const preferAbove = currentStep.position === 'above';
     const gap = 12;
+    const tooltipHeight = 220; // approximate max tooltip height
+    const spaceAbove = targetRect.top;
+    const spaceBelow = window.innerHeight - (targetRect.top + targetRect.height);
+    const preferAbove = currentStep.position === 'above' && spaceAbove > tooltipHeight;
+    const placeAbove = preferAbove || spaceBelow < tooltipHeight;
 
-    if (preferAbove) {
+    if (placeAbove && spaceAbove > tooltipHeight) {
       return {
         position: 'fixed',
         bottom: window.innerHeight - targetRect.top + gap,
