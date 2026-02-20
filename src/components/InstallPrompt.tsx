@@ -14,8 +14,9 @@ export default function InstallPrompt() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Don't show if already installed or previously dismissed this session
+    // Don't show if already installed or on desktop
     if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
 
     const handler = (e: Event) => {
       e.preventDefault();
