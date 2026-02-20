@@ -31,15 +31,37 @@ const montserrat = Montserrat({
   weight: ['600', '700'],
 });
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swapify.312.dev';
+const description =
+  'A shared playlist that clears as you listen — friends drop songs in, you react, and the queue empties itself.';
+
 export const metadata: Metadata = {
-  title: 'Swapify',
-  description:
-    'A shared playlist that clears as you listen — friends drop songs in, you react, and the queue empties itself.',
+  title: {
+    default: 'Swapify',
+    template: '%s | Swapify',
+  },
+  description,
   manifest: '/manifest.json',
+  metadataBase: new URL(appUrl),
+  openGraph: {
+    type: 'website',
+    siteName: 'Swapify',
+    title: 'Swapify — Swap songs with friends',
+    description,
+    url: appUrl,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Swapify — Swap songs with friends',
+    description,
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Swapify',
+  },
+  other: {
+    'msapplication-TileColor': '#081420',
   },
 };
 
