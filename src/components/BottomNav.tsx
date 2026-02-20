@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ListMusic } from 'lucide-react';
 
-const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist'];
+const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist', '/circle'];
 
 function ActivityIcon({ className }: { className?: string }) {
   return (
@@ -67,22 +67,22 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-t border-white/[0.08] pb-[env(safe-area-inset-bottom)]"
+      className="fixed left-0 right-0 z-50 bg-black/80 backdrop-blur-xl bottom-0 border-t border-white/[0.08] pb-[env(safe-area-inset-bottom)] sm:top-0 sm:bottom-auto sm:border-t-0 sm:border-b sm:border-white/[0.08] sm:pb-0"
       data-tour="bottom-nav"
     >
-      <div className="flex items-center justify-around h-16">
+      <div className="flex items-center justify-around h-16 max-w-2xl mx-auto w-full sm:justify-center sm:gap-2">
         {tabs.map(({ label, href, icon: Icon }) => {
           const isActive = activeTab === href;
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${
+              className={`flex items-center justify-center transition-colors duration-200 flex-col flex-1 h-full sm:flex-row sm:flex-initial sm:gap-2 sm:px-5 sm:rounded-lg sm:h-10 sm:hover:bg-white/[0.06] ${
                 isActive ? 'text-brand' : 'text-text-secondary'
               }`}
             >
               <Icon />
-              <span className="text-xs font-medium mt-1">{label}</span>
+              <span className="text-xs font-medium mt-1 sm:mt-0 sm:text-sm">{label}</span>
             </Link>
           );
         })}

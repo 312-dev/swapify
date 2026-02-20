@@ -7,7 +7,7 @@ import TooltipProvider from './TooltipProvider';
 import PageTransition from './PageTransition';
 import { TransitionDirectionProvider } from '@/lib/TransitionContext';
 
-const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist'];
+const AUTHENTICATED_PREFIXES = ['/dashboard', '/activity', '/profile', '/playlist', '/circle'];
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,8 +17,14 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   return (
     <LazyMotion features={domAnimation}>
       <TransitionDirectionProvider>
-        <div className={`overflow-x-hidden ${showBottomNav ? 'pb-20' : ''}`}>
-          {showBottomNav ? <PageTransition>{children}</PageTransition> : children}
+        <div className={`overflow-x-hidden ${showBottomNav ? 'pb-20 sm:pb-0 sm:pt-20' : ''}`}>
+          {showBottomNav ? (
+            <div className="max-w-2xl mx-auto w-full">
+              <PageTransition>{children}</PageTransition>
+            </div>
+          ) : (
+            children
+          )}
         </div>
         <BottomNav />
         <TooltipProvider />

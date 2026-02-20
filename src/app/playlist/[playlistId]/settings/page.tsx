@@ -262,12 +262,10 @@ export default function PlaylistSettingsPage() {
           </button>
         </form>
 
-        {/* Danger zone */}
-        <div className="glass rounded-xl p-5 mt-8 border border-danger/20">
-          <h2 className="text-base font-medium text-danger mb-2">Danger zone</h2>
+        <div className="mt-6 flex justify-center">
           <button
             onClick={() => setShowDeleteDialog(true)}
-            className="btn-pill text-danger border border-danger/30 hover:bg-danger/10"
+            className="text-sm text-danger/70 hover:text-danger transition-colors py-2"
           >
             Delete this Swaplist
           </button>

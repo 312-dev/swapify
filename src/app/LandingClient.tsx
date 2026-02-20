@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, m } from 'motion/react';
+import { m } from 'motion/react';
 import { Globe, Mail, Plus, UserPlus } from 'lucide-react';
 import { AudioLinesIcon, type AudioLinesIconHandle } from '@/components/ui/audio-lines';
 import { FlameIcon, type FlameIconHandle } from '@/components/ui/flame';
@@ -441,7 +441,7 @@ function FeatureTags() {
 
   return (
     <m.div
-      className="flex flex-wrap items-center gap-x-5 gap-y-3 mt-10"
+      className="flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-3 mt-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 1.3, duration: 0.6 }}
@@ -476,12 +476,6 @@ export default function LandingClient() {
   const [signInQuery, setSignInQuery] = useState('');
   const [signInError, setSignInError] = useState('');
   const [isSignInLooking, setIsSignInLooking] = useState(false);
-  const [signInResult, setSignInResult] = useState<{
-    displayName: string;
-    avatarUrl: string | null;
-    spotifyClientId: string;
-    circleId: string;
-  } | null>(null);
 
   async function handleJoinSubmit() {
     if (!joinCode.trim()) return;
@@ -512,7 +506,6 @@ export default function LandingClient() {
     if (!signInQuery.trim()) return;
     setIsSignInLooking(true);
     setSignInError('');
-    setSignInResult(null);
     try {
       const res = await fetch(`/api/auth/lookup?q=${encodeURIComponent(signInQuery.trim())}`);
       if (!res.ok) {
@@ -520,32 +513,27 @@ export default function LandingClient() {
         throw new Error(data.error || 'No account found');
       }
       const data = await res.json();
-      setSignInResult(data);
+      // Redirect straight to Spotify login
+      const params = new URLSearchParams({
+        clientId: data.spotifyClientId,
+        circleId: data.circleId,
+        circleAction: 'reauth',
+        returnTo: '/dashboard',
+      });
+      window.location.href = `/api/auth/login?${params}`;
     } catch (err) {
       setSignInError(err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
       setIsSignInLooking(false);
     }
   }
 
-  function handleSignIn() {
-    if (!signInResult) return;
-    const params = new URLSearchParams({
-      clientId: signInResult.spotifyClientId,
-      circleId: signInResult.circleId,
-      circleAction: 'reauth',
-      returnTo: '/dashboard',
-    });
-    window.location.href = `/api/auth/login?${params}`;
-  }
-
   return (
-    <div className="h-dvh overflow-x-hidden flex flex-col">
+    <div className="min-h-dvh overflow-x-hidden flex flex-col">
       {/* ───────── Banner ───────── */}
       <SpotifyChangesBanner />
 
       {/* ───────── Hero ───────── */}
-      <section className="relative flex-1 flex items-center overflow-hidden">
+      <section className="relative flex-1 flex items-center overflow-clip">
         {/* Background */}
         <div className="absolute inset-0 gradient-bg-radial" />
         <div className="landing-glow" />
@@ -559,7 +547,7 @@ export default function LandingClient() {
         <div className="absolute top-[18%] left-[8%] w-32 h-32 rounded-full bg-brand/[0.04] blur-2xl" />
         <div className="absolute bottom-[20%] right-[5%] w-48 h-48 rounded-full bg-accent-green/[0.03] blur-3xl" />
 
-        <div className="relative z-10 max-w-6xl mx-auto w-full px-6 pt-10 sm:pt-14 pb-12 flex flex-col">
+        <div className="relative z-10 max-w-6xl mx-auto w-full px-6 pt-16 sm:pt-14 pb-12 flex flex-col">
           {/* Centered brand mark */}
           <m.div
             className="flex items-center justify-center gap-4 mb-12 lg:mb-14"
@@ -587,7 +575,7 @@ export default function LandingClient() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-12 items-center flex-1">
             {/* Left — copy */}
-            <div>
+            <div className="text-center lg:text-left">
               <h1 className="text-[2.75rem] sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[0.95]">
                 {[
                   { text: 'A shared playlist', className: '' },
@@ -612,7 +600,7 @@ export default function LandingClient() {
               </h1>
 
               <m.p
-                className="text-lg text-text-secondary max-w-md mb-10"
+                className="text-lg text-text-secondary max-w-md mx-auto lg:mx-0 mb-10"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ...springs.gentle, delay: 0.9 }}
@@ -622,13 +610,13 @@ export default function LandingClient() {
               </m.p>
 
               <m.div
-                className="flex flex-wrap items-center gap-3"
+                className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ...springs.gentle, delay: 1.1 }}
               >
                 <button
-                  onClick={() => setShowGetStarted(!showGetStarted)}
+                  onClick={() => setShowGetStarted(true)}
                   className="btn-pill text-base px-8 py-3.5 inline-flex bg-accent-green text-black hover:bg-accent-green/90 active:scale-[0.98] hover:scale-[1.02] font-heading glow-green"
                 >
                   <SpotifyIcon />
@@ -642,100 +630,12 @@ export default function LandingClient() {
                 </button>
               </m.div>
 
-              {/* Inline Get Started section */}
-              <AnimatePresence>
-                {showGetStarted && (
-                  <m.div
-                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                    animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
-                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                    transition={springs.smooth}
-                    className="overflow-hidden"
-                  >
-                    <div className="glass rounded-2xl p-5 space-y-3 max-w-md">
-                      {/* Start a Swaplist */}
-                      <button
-                        onClick={() => {
-                          setShowGetStarted(false);
-                          setShowSetupWizard(true);
-                        }}
-                        className="w-full glass rounded-xl p-4 text-left active:scale-[0.98] transition-transform group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-brand/15 shrink-0">
-                            <Plus className="w-5 h-5 text-brand" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-text-primary group-hover:text-brand transition-colors">
-                              Start a Swaplist
-                            </h3>
-                            <p className="text-sm text-text-secondary mt-1">
-                              Start a shared song inbox with your crew
-                            </p>
-                          </div>
-                          <svg
-                            className="w-5 h-5 text-text-tertiary group-hover:text-brand transition-colors shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
-                        </div>
-                      </button>
-
-                      {/* Join a Swaplist */}
-                      <div className="w-full glass rounded-xl p-4">
-                        <div className="flex items-start gap-4 mb-3">
-                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-brand/15 shrink-0">
-                            <UserPlus className="w-5 h-5 text-brand" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-text-primary mb-1">
-                              Join a Swaplist
-                            </h3>
-                            <p className="text-sm text-text-secondary">
-                              I have an invite link or code from a friend
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={joinCode}
-                            onChange={(e) => {
-                              setJoinCode(e.target.value);
-                              setJoinError('');
-                            }}
-                            placeholder="Enter invite code"
-                            className="input-glass flex-1 text-sm"
-                            maxLength={10}
-                          />
-                          <button
-                            onClick={handleJoinSubmit}
-                            disabled={!joinCode.trim() || isResolving}
-                            className="btn-pill btn-pill-primary btn-pill-sm shrink-0 disabled:opacity-50"
-                          >
-                            {isResolving ? 'Finding...' : 'Join'}
-                          </button>
-                        </div>
-                        {joinError && <p className="text-xs text-danger mt-2">{joinError}</p>}
-                        <p className="text-sm text-text-tertiary mt-2">
-                          Or open the invite link your host sent you directly
-                        </p>
-                      </div>
-                    </div>
-                  </m.div>
-                )}
-              </AnimatePresence>
-
               {/* Feature tags — icons animate sequentially */}
               <FeatureTags />
             </div>
 
-            {/* Right — phone + floating UI elements */}
-            <div className="flex justify-center lg:justify-end">
+            {/* Right — phone + floating UI elements (hidden on mobile) */}
+            <div className="hidden lg:flex lg:justify-end">
               <div className="relative">
                 {/* Floating notification — "Sarah added a track" */}
                 <m.div
@@ -823,25 +723,44 @@ export default function LandingClient() {
 
       {/* ───────── Footer ───────── */}
       <footer className="border-t border-glass-border">
-        <div className="max-w-5xl mx-auto px-5 py-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Left — copyright + company */}
-          <p className="text-xs text-text-secondary" suppressHydrationWarning>
+        <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between gap-4">
+          <p className="text-xs text-text-tertiary" suppressHydrationWarning>
             &copy; {new Date().getFullYear()}{' '}
             <a
               href="https://312.dev"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-text-primary transition-colors"
+              className="hover:text-text-secondary transition-colors"
             >
               312.dev LLC
             </a>
+            <span className="hidden sm:inline">
+              {' '}
+              &middot; Built on Spotify. Icon by{' '}
+              <a
+                href="https://thenounproject.com/icon/share-song-7686374/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-text-secondary transition-colors"
+              >
+                S. Belalcazar Lareo
+              </a>
+              . Videos by{' '}
+              <a
+                href="https://www.pexels.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-text-secondary transition-colors"
+              >
+                Pexels
+              </a>
+            </span>
           </p>
 
-          {/* Right — icon links */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 shrink-0">
             <a
               href="mailto:ope@312.dev"
-              className="text-text-secondary hover:text-text-primary transition-colors"
+              className="text-text-tertiary hover:text-text-primary transition-colors"
               aria-label="Email us"
               title="ope@312.dev"
             >
@@ -851,7 +770,7 @@ export default function LandingClient() {
               href="https://312.dev"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-text-secondary hover:text-text-primary transition-colors"
+              className="text-text-tertiary hover:text-text-primary transition-colors"
               aria-label="312.dev"
               title="312.dev"
             >
@@ -859,40 +778,98 @@ export default function LandingClient() {
             </a>
           </div>
         </div>
-
-        {/* Attribution — subtle, separate row */}
-        <div className="max-w-5xl mx-auto px-5 pb-5">
-          <p className="text-xs text-text-tertiary">
-            Built on Spotify. Icon &ldquo;Share Song&rdquo; by{' '}
-            <a
-              href="https://thenounproject.com/icon/share-song-7686374/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-text-secondary transition-colors"
-            >
-              S. Belalcazar Lareo
-            </a>{' '}
-            &mdash;{' '}
-            <a
-              href="https://thenounproject.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-text-secondary transition-colors"
-            >
-              Noun Project
-            </a>
-            . Videos by{' '}
-            <a
-              href="https://www.pexels.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-text-secondary transition-colors"
-            >
-              Pexels
-            </a>
-          </p>
-        </div>
       </footer>
+
+      {/* Get Started dialog */}
+      <Dialog
+        open={showGetStarted}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowGetStarted(false);
+            setJoinCode('');
+            setJoinError('');
+          }
+        }}
+      >
+        <DialogContent className="bg-[var(--surface-elevated)] border-white/[0.08] backdrop-blur-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-text-primary">Get Started</DialogTitle>
+            <DialogDescription className="sr-only">Start or join a Swaplist</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* Start a Swaplist */}
+            <button
+              onClick={() => {
+                setShowGetStarted(false);
+                setShowSetupWizard(true);
+              }}
+              className="w-full rounded-xl p-4 text-left active:scale-[0.98] transition-transform group bg-white/4 border border-white/6 hover:bg-white/7"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-brand/15 shrink-0">
+                  <Plus className="w-5 h-5 text-brand" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-text-primary group-hover:text-brand transition-colors">
+                    Start a Swaplist
+                  </h3>
+                  <p className="text-sm text-text-secondary mt-1">
+                    Start a shared song inbox with your crew
+                  </p>
+                </div>
+                <svg
+                  className="w-5 h-5 text-text-tertiary group-hover:text-brand transition-colors shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+
+            {/* Join a Swaplist */}
+            <div className="w-full rounded-xl p-4 bg-white/4 border border-white/6">
+              <div className="flex items-start gap-4 mb-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-brand/15 shrink-0">
+                  <UserPlus className="w-5 h-5 text-brand" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-text-primary mb-1">Join a Swaplist</h3>
+                  <p className="text-sm text-text-secondary">
+                    I have an invite link or code from a friend
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={joinCode}
+                  onChange={(e) => {
+                    setJoinCode(e.target.value);
+                    setJoinError('');
+                  }}
+                  placeholder="Enter invite code"
+                  className="input-glass flex-1 text-sm"
+                  maxLength={10}
+                />
+                <button
+                  onClick={handleJoinSubmit}
+                  disabled={!joinCode.trim() || isResolving}
+                  className="btn-pill btn-pill-primary btn-pill-sm shrink-0 disabled:opacity-50"
+                >
+                  {isResolving ? 'Looking up...' : 'Join'}
+                </button>
+              </div>
+              {joinError && <p className="text-xs text-danger mt-2">{joinError}</p>}
+              <p className="text-sm text-text-tertiary mt-2">
+                Or open the invite link your host sent you directly
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Setup Wizard for hosts */}
       <SpotifySetupWizard isOpen={showSetupWizard} onClose={() => setShowSetupWizard(false)} />
@@ -905,89 +882,39 @@ export default function LandingClient() {
             setShowSignIn(false);
             setSignInQuery('');
             setSignInError('');
-            setSignInResult(null);
           }
         }}
       >
         <DialogContent className="bg-[var(--surface-elevated)] border-white/[0.08] backdrop-blur-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-text-primary">Sign Back In</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-text-primary">Sign in</DialogTitle>
             <DialogDescription className="sr-only">
               Find your account and sign back in with Spotify
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {!signInResult ? (
-              <>
-                <p className="text-sm text-text-secondary">
-                  Enter your Spotify username or verified email to look up your account.
-                </p>
-                <input
-                  type="text"
-                  value={signInQuery}
-                  onChange={(e) => {
-                    setSignInQuery(e.target.value);
-                    setSignInError('');
-                  }}
-                  placeholder="Spotify username or email"
-                  className="input-glass w-full"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSignInLookup()}
-                />
-                <button
-                  onClick={handleSignInLookup}
-                  disabled={!signInQuery.trim() || isSignInLooking}
-                  className="btn-pill btn-pill-primary w-full disabled:opacity-50"
-                >
-                  {isSignInLooking ? 'Looking up...' : 'Look up account'}
-                </button>
-                {signInError && <p className="text-xs text-danger mt-2">{signInError}</p>}
-              </>
-            ) : (
-              <div className="space-y-4">
-                <div className="glass rounded-xl p-5 flex items-center gap-4">
-                  {signInResult.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={signInResult.avatarUrl}
-                      alt={signInResult.displayName}
-                      className="w-12 h-12 rounded-full object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
-                      <span className="text-lg font-bold text-brand">
-                        {signInResult.displayName.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-text-primary truncate">
-                      {signInResult.displayName}
-                    </p>
-                    <p className="text-sm text-text-tertiary">Account found</p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleSignIn}
-                  className="btn-pill w-full bg-accent-green hover:bg-accent-green/90 text-black font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                  </svg>
-                  Sign in with Spotify
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSignInResult(null);
-                    setSignInQuery('');
-                  }}
-                  className="text-sm text-text-secondary hover:text-text-primary transition-colors w-full text-center"
-                >
-                  Not you? Try again
-                </button>
-              </div>
-            )}
+            <p className="text-sm text-text-secondary">
+              Enter your Spotify username or verified email to look up your account.
+            </p>
+            <input
+              type="text"
+              value={signInQuery}
+              onChange={(e) => {
+                setSignInQuery(e.target.value);
+                setSignInError('');
+              }}
+              placeholder="Spotify username or email"
+              className="input-glass w-full"
+              onKeyDown={(e) => e.key === 'Enter' && handleSignInLookup()}
+            />
+            <button
+              onClick={handleSignInLookup}
+              disabled={!signInQuery.trim() || isSignInLooking}
+              className="btn-pill btn-pill-primary w-full disabled:opacity-50"
+            >
+              {isSignInLooking ? 'Signing in...' : 'Sign in'}
+            </button>
+            {signInError && <p className="text-xs text-danger mt-2">{signInError}</p>}
           </div>
         </DialogContent>
       </Dialog>

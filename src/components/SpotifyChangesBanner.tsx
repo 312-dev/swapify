@@ -13,7 +13,6 @@ import {
   Music,
 } from 'lucide-react';
 import GlassDrawer from '@/components/ui/glass-drawer';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const FEATURES = [
   { label: 'Add', tip: 'Add tracks to the Swaplist' },
@@ -54,22 +53,23 @@ export default function SpotifyChangesBanner() {
 
   return (
     <>
-      <div className="relative z-50 w-full bg-brand/10 border-b border-brand/20 px-5 py-2.5">
+      <button
+        type="button"
+        onClick={() => setDrawerOpen(true)}
+        className="relative z-50 w-full bg-brand/10 border-b border-brand/20 px-5 py-2.5 text-left cursor-pointer hover:bg-brand/15 transition-colors"
+      >
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           <Info className="w-4 h-4 text-brand shrink-0" />
           <p className="text-sm text-text-secondary flex-1 min-w-0">
             A shared playlist that clears as you listen &mdash; friends drop songs in, you react,
             and the queue empties itself.{' '}
-            <button
-              onClick={() => setDrawerOpen(true)}
-              className="text-brand hover:text-brand-hover inline-flex items-center gap-0.5 font-medium transition-colors"
-            >
+            <span className="text-brand font-medium inline-flex items-center gap-0.5">
               See how it works
               <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            </span>
           </p>
         </div>
-      </div>
+      </button>
 
       <GlassDrawer
         isOpen={drawerOpen}
@@ -109,47 +109,32 @@ export default function SpotifyChangesBanner() {
             <p className="text-base text-text-secondary mb-3">
               Depending on how you join, you&apos;ll have different capabilities:
             </p>
-            <div className="glass rounded-xl overflow-x-auto">
-              <table className="w-full min-w-105">
+            <div className="glass rounded-xl">
+              <table className="w-full">
                 <thead>
                   <tr className="border-b border-glass-border">
                     <th className="text-left px-4 py-3 text-sm text-text-secondary uppercase tracking-wider">
-                      Role
+                      Feature
                     </th>
-                    {FEATURES.map((f) => (
-                      <th
-                        key={f.label}
-                        className="px-2 py-3 text-center text-sm text-text-secondary font-medium whitespace-nowrap"
-                      >
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="border-b border-dotted border-text-tertiary cursor-help">
-                              {f.label}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" sideOffset={4}>
-                            {f.tip}
-                          </TooltipContent>
-                        </Tooltip>
+                    {ROLES.map((role) => (
+                      <th key={role.name} className="px-2 py-3 text-center">
+                        <span
+                          className={`flex flex-col items-center gap-1 text-sm font-medium ${role.color}`}
+                        >
+                          <role.icon className="w-4 h-4" />
+                          {role.name}
+                        </span>
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {ROLES.map((role, ri) => (
-                    <tr key={role.name} className={ri % 2 === 0 ? 'bg-white/2' : ''}>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`flex items-center gap-2 text-base font-medium ${role.color}`}
-                        >
-                          <role.icon className="w-4 h-4" />
-                          {role.name}
-                        </span>
-                        <span className="block text-sm text-text-secondary ml-6">{role.desc}</span>
-                      </td>
-                      {role.features.map((has, fi) => (
-                        <td key={FEATURES[fi]?.label} className="px-2 py-3 text-center">
-                          {has ? (
+                  {FEATURES.map((f, fi) => (
+                    <tr key={f.label} className={fi % 2 === 0 ? 'bg-white/2' : ''}>
+                      <td className="px-4 py-2.5 text-sm text-text-secondary">{f.label}</td>
+                      {ROLES.map((role) => (
+                        <td key={role.name} className="px-2 py-2.5 text-center">
+                          {role.features[fi] ? (
                             <Check className={`w-4 h-4 ${role.color} inline-block`} />
                           ) : (
                             <Minus className="w-4 h-4 text-text-tertiary/30 inline-block" />
