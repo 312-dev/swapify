@@ -34,7 +34,7 @@ interface ProfileClientProps {
 
 export default function ProfileClient(props: ProfileClientProps) {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<div className="min-h-screen gradient-bg" />}>
       <ProfileContent {...props} />
     </Suspense>
   );
@@ -272,7 +272,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen gradient-bg">
       {/* Header */}
       <div className="gradient-bg-radial px-5 pt-10 pb-8 flex flex-col items-center text-center">
         <m.div

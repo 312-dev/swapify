@@ -1,6 +1,6 @@
 export default function ProfileLoading() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen gradient-bg">
       {/* Header skeleton */}
       <div className="gradient-bg-radial px-5 pt-10 pb-8 flex flex-col items-center text-center">
         <div className="w-24 h-24 rounded-full skeleton mb-4" />
