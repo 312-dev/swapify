@@ -27,8 +27,8 @@ interface GlassDrawerProps {
 }
 
 const HEIGHT_CLASS: Record<string, string> = {
-  half: 'max-h-[50vh]',
-  full: 'max-h-[90vh]',
+  half: 'max-h-[50dvh]',
+  full: 'max-h-[90dvh]',
 };
 
 export default function GlassDrawer({
@@ -48,7 +48,7 @@ export default function GlassDrawer({
   if (isDesktop) {
     return (
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="bg-[#1a1a1a] border-white/[0.12] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-[#1a1a1a] border-white/[0.12] sm:max-w-2xl max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             {title ? (
               <DialogTitle className="text-xl font-bold text-text-primary">{title}</DialogTitle>

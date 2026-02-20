@@ -195,6 +195,16 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Mobile keyboard: scroll focused inputs into view */
+@supports (height: 1dvh) {
+  input:focus,
+  textarea:focus,
+  select:focus,
+  [contenteditable='true']:focus {
+    scroll-margin-bottom: 40dvh;
+  }
+}
+
 /* Hide scrollbar for carousels */
 .scrollbar-none {
   -ms-overflow-style: none;
