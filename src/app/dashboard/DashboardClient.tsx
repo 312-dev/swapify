@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { compressImageForSpotify } from '@/lib/image-compress';
 import { ImagePlus, Pencil, Plus, Search, Download, ChevronRight, ChevronLeft } from 'lucide-react';
 import { m } from 'motion/react';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
@@ -277,16 +278,16 @@ export default function DashboardClient({
     setIsCreating(false);
   }
 
-  function handleCreateImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleCreateImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 256 * 1024) {
-      toast.error('Image must be under 256KB for Spotify');
-      return;
+
+    try {
+      const dataUrl = await compressImageForSpotify(file);
+      setCreateImagePreview(dataUrl);
+    } catch {
+      toast.error('Image could not be compressed under 256KB');
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => setCreateImagePreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
   }
 
   function resetImportState() {
@@ -589,7 +590,7 @@ export default function DashboardClient({
                 <input
                   ref={createFileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handleCreateImageSelect}
                   className="hidden"
                 />
