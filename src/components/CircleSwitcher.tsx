@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import GlassDrawer from '@/components/ui/glass-drawer';
 import SpotifySetupWizard from '@/components/SpotifySetupWizard';
 import { springs, STAGGER_DELAY } from '@/lib/motion';
+import { useUnreadActivity } from '@/components/UnreadActivityProvider';
 
 interface CircleMember {
   id: string;
@@ -71,6 +72,7 @@ export default function CircleSwitcher({
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
+  const { markRead } = useUnreadActivity();
   const userHostsCircle = circles.some((c) => c.role === 'host');
 
   async function handleSwitch(circleId: string) {
@@ -93,6 +95,7 @@ export default function CircleSwitcher({
         throw new Error(data.error || 'Failed to switch circle');
       }
 
+      markRead({ circleId });
       setIsOpen(false);
       router.refresh();
     } catch (err) {
@@ -158,7 +161,18 @@ export default function CircleSwitcher({
         className="mx-auto flex items-center gap-1.5 px-4 py-1.5 rounded-full glass active:scale-[0.97] transition-transform"
         aria-label="Switch circle"
       >
-        <Users className="w-3.5 h-3.5 text-brand shrink-0" />
+        {(() => {
+          const activeCircle = circles.find((c) => c.id === activeCircleId);
+          return activeCircle?.imageUrl ? (
+            <img
+              src={activeCircle.imageUrl}
+              alt=""
+              className="w-5 h-5 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <Users className="w-3.5 h-3.5 text-brand shrink-0" />
+          );
+        })()}
         <span className="text-sm font-semibold text-text-primary truncate max-w-45">
           {activeCircleName ?? 'Select circle'}
         </span>
@@ -184,9 +198,9 @@ export default function CircleSwitcher({
             return (
               <m.div
                 key={circle.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ ...springs.gentle, delay: STAGGER_DELAY * index }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15, delay: STAGGER_DELAY * index }}
                 className={`w-full glass rounded-xl p-4 flex items-center gap-3 ${
                   isActive ? 'ring-1 ring-brand/40 glow-brand' : ''
                 }`}
@@ -313,9 +327,9 @@ export default function CircleSwitcher({
 
           {/* Join a Circle — inline expandable section */}
           <m.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...springs.gentle, delay: STAGGER_DELAY * circles.length }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15, delay: STAGGER_DELAY * circles.length }}
           >
             <AnimatePresence mode="wait">
               {!showJoinForm ? (
@@ -507,9 +521,9 @@ export default function CircleSwitcher({
 
           {/* Create a Circle — disabled if user already hosts one */}
           <m.button
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...springs.gentle, delay: STAGGER_DELAY * (circles.length + 1) }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15, delay: STAGGER_DELAY * (circles.length + 1) }}
             onClick={handleCreateCircle}
             disabled={userHostsCircle}
             className={`w-full glass rounded-xl p-4 flex items-center gap-3 text-left transition-transform ${

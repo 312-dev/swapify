@@ -123,17 +123,41 @@ body {
   background: var(--glass-bg-hover);
 }
 
-/* Gradient backgrounds */
-.gradient-bg {
+/* Gradient backgrounds — full-bleed so they aren't boxed in by max-w containers */
+.gradient-bg,
+.gradient-bg-radial {
+  position: relative;
+}
+
+.gradient-bg::before,
+.gradient-bg-radial::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gradient-bg::before {
   background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 60%);
 }
 
-.gradient-bg-radial {
+.gradient-bg-radial::before {
   background: radial-gradient(
     ellipse at top,
     var(--bg-gradient-start) 0%,
     var(--bg-gradient-end) 70%
   );
+}
+
+.gradient-bg > *,
+.gradient-bg-radial > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Subtle film grain overlay — adds tactile analog depth */
