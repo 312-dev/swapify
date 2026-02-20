@@ -64,8 +64,13 @@ function JoinPlaylistContent() {
         const data = await res.json();
         throw new Error(data.error || 'Invalid invite code');
       }
-      const playlist = await res.json();
-      setPreview(playlist);
+      const data = await res.json();
+      // If this is a circle code, redirect to circle join
+      if (data.type === 'circle') {
+        router.replace(`/circle/join?code=${encodeURIComponent(inviteCode)}`);
+        return;
+      }
+      setPreview(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid invite code');
     } finally {

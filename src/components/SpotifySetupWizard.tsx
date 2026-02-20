@@ -152,7 +152,7 @@ export default function SpotifySetupWizard({ isOpen, onClose }: SpotifySetupWiza
             href="https://developer.spotify.com/documentation/web-api"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-text-tertiary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+            className="text-sm text-text-tertiary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
           >
             Need help?
             <ExternalLink className="w-3 h-3" />
@@ -214,7 +214,7 @@ function StepOne({
           transition={{ ...springs.gentle, delay: STAGGER_DELAY * 3 }}
         >
           <span>Fill in the following details:</span>
-          <ul className="mt-2 flex flex-col gap-1.5 list-disc list-outside ml-4 text-text-tertiary">
+          <ul className="mt-2 flex flex-col gap-1.5 list-disc list-outside ml-4 text-text-secondary">
             <li>
               <span className="text-text-secondary">App name:</span>{' '}
               <span className="text-text-primary font-medium">Swapify</span>{' '}
@@ -222,11 +222,11 @@ function StepOne({
             </li>
             <li>
               <span className="text-text-secondary">Description:</span>{' '}
-              <span className="italic">A shared music inbox for you and your friends</span>
+              <span className="italic">A shared playlist that clears as you listen</span>
             </li>
             <li>
               <span className="text-text-secondary">Website:</span>{' '}
-              <code className="text-xs bg-white/5 px-1.5 py-0.5 rounded">
+              <code className="text-sm bg-white/5 px-1.5 py-0.5 rounded">
                 https://swapify.312.dev
               </code>
             </li>
@@ -235,7 +235,7 @@ function StepOne({
               <span className="text-brand font-semibold">(must be exact)</span>:
               {/* Copyable redirect URI box */}
               <div className="mt-2 glass rounded-lg flex items-center gap-2 px-3 py-2.5">
-                <code className="text-xs text-text-primary flex-1 break-all select-all">
+                <code className="text-sm text-text-primary flex-1 break-all select-all">
                   {redirectUri}
                 </code>
                 <button
@@ -339,7 +339,7 @@ function StepTwo({
         )}
       </div>
 
-      <p className="text-xs text-text-tertiary">
+      <p className="text-sm text-text-tertiary">
         You&apos;ll be asked to authorize Swapify to access your Spotify account.
       </p>
 
@@ -356,7 +356,7 @@ function StepTwo({
           type="button"
           onClick={onConnect}
           disabled={!isValid}
-          className="btn-pill flex-1 bg-[#1DB954] hover:bg-[#1ed760] text-black font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="btn-pill flex-1 bg-accent-green hover:bg-accent-green/90 text-black font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Connect with Spotify
         </button>

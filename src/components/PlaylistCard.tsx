@@ -29,7 +29,7 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
     <motion.div whileTap={{ scale: 0.98 }} transition={springs.snappy}>
       <Link
         href={`/playlist/${playlist.id}`}
-        className="glass rounded-2xl p-3.5 block active:bg-white/6 transition-colors"
+        className="glass rounded-2xl p-3.5 block active:bg-white/6 transition-colors glow-brand-hover"
       >
         <div className="flex items-center gap-3.5">
           {/* Cover image with avatar overlay */}
@@ -57,18 +57,16 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
 
           {/* Info stack */}
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-semibold truncate text-text-primary leading-tight">
+            <p className="text-base font-semibold truncate text-text-primary leading-tight">
               {playlist.name}
             </p>
 
             {playlist.vibeName && playlist.activeTrackCount > 3 && (
-              <p className="text-[12px] text-brand/80 italic truncate mt-0.5">
-                {playlist.vibeName}
-              </p>
+              <p className="text-sm text-brand italic truncate mt-0.5">{playlist.vibeName}</p>
             )}
 
             {/* Metadata line */}
-            <p className="text-[13px] text-text-tertiary mt-0.5 truncate">
+            <p className="text-sm text-text-tertiary mt-0.5 truncate">
               {playlist.memberCount} member{playlist.memberCount === 1 ? '' : 's'} &middot;{' '}
               {playlist.likedTrackCount}/{playlist.totalTrackCount} liked
             </p>
@@ -88,7 +86,7 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
                   ) : (
                     <div
                       key={member.id}
-                      className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-medium text-text-secondary"
+                      className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-medium text-text-secondary"
                       data-tooltip={member.displayName}
                     >
                       {member.displayName[0]}
@@ -97,7 +95,7 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
                 )}
                 {playlist.memberCount > 4 && (
                   <div
-                    className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-medium text-text-tertiary"
+                    className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-medium text-text-tertiary"
                     data-tooltip={`${playlist.memberCount - 4} more`}
                   >
                     +{playlist.memberCount - 4}
@@ -105,7 +103,7 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
                 )}
               </div>
               {playlist.unplayedCount > 0 && (
-                <span className="text-[11px] font-semibold text-brand">
+                <span className="text-xs font-semibold text-brand">
                   {playlist.unplayedCount} new
                 </span>
               )}
@@ -114,7 +112,7 @@ export default function PlaylistCard({ playlist }: PlaylistCardProps) {
 
           {/* Chevron */}
           <svg
-            className="w-4 h-4 text-text-tertiary/60 shrink-0"
+            className="w-4 h-4 text-text-tertiary shrink-0"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

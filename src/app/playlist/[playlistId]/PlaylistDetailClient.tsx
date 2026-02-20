@@ -16,19 +16,22 @@ import LikedTracksView from '@/components/LikedTracksView';
 import OutcastTracksView from '@/components/OutcastTracksView';
 import { Crown } from 'lucide-react';
 import { toast } from 'sonner';
+import ReauthOverlay from '@/components/ReauthOverlay';
 
 interface PlaylistDetailClientProps {
   playlistId: string;
   playlistName: string;
   playlistDescription: string | null;
   playlistImageUrl: string | null;
-  inviteCode: string;
   isOwner: boolean;
   ownerId: string;
   currentUserId: string;
   spotifyPlaylistId: string;
   vibeName: string | null;
-  circleSpotifyClientId?: string;
+  circleInviteCode: string;
+  circleName: string;
+  circleId: string;
+  spotifyClientId: string;
 }
 
 interface TrackData {
@@ -102,16 +105,19 @@ export default function PlaylistDetailClient({
   playlistName,
   playlistDescription,
   playlistImageUrl,
-  inviteCode,
   isOwner,
   ownerId,
   currentUserId,
   spotifyPlaylistId,
   vibeName,
-  circleSpotifyClientId,
+  circleInviteCode,
+  circleName,
+  circleId,
+  spotifyClientId,
 }: PlaylistDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [needsReauth, setNeedsReauth] = useState(false);
   const [tracks, setTracks] = useState<TrackData[]>([]);
   const [members, setMembers] = useState<
     Array<{ id: string; displayName: string; avatarUrl: string | null }>
@@ -145,6 +151,9 @@ export default function PlaylistDetailClient({
         setOutcastTracks(data.outcastTracks ?? []);
         setLikedPlaylistId(data.likedPlaylistId ?? null);
         if (data.vibeName !== undefined) setCurrentVibeName(data.vibeName);
+      } else if (res.status === 401) {
+        const data = await res.json();
+        if (data.needsReauth) setNeedsReauth(true);
       }
     } catch {
       // Silently fail on refresh
@@ -182,14 +191,14 @@ export default function PlaylistDetailClient({
     return () => clearInterval(interval);
   }, [fetchTracks]);
 
-  // Auto-open share sheet when arriving from playlist creation
+  // Auto-open share sheet when arriving from playlist creation (host only)
   useEffect(() => {
-    if (searchParams.get('share') === '1') {
+    if (isOwner && searchParams.get('share') === '1') {
       setShowShare(true);
       // Clean the URL without triggering a navigation
       window.history.replaceState({}, '', `/playlist/${playlistId}`);
     }
-  }, [searchParams, playlistId]);
+  }, [searchParams, playlistId, isOwner]);
 
   async function syncFromSpotify() {
     setSyncing(true);
@@ -206,6 +215,9 @@ export default function PlaylistDetailClient({
           if (data.metadata.imageUrl !== undefined) setCurrentImageUrl(data.metadata.imageUrl);
         }
         await fetchTracks();
+      } else if (res.status === 401) {
+        const data = await res.json();
+        if (data.needsReauth) setNeedsReauth(true);
       }
     } catch {
       // Silently fail
@@ -301,6 +313,8 @@ export default function PlaylistDetailClient({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {needsReauth && <ReauthOverlay spotifyClientId={spotifyClientId} circleId={circleId} />}
+
       {/* Gradient header — dynamic album colors or fallback */}
       <div
         className={albumColors.isExtracted ? 'px-5 pt-8 pb-6' : 'gradient-bg-radial px-5 pt-8 pb-6'}
@@ -392,7 +406,7 @@ export default function PlaylistDetailClient({
                 </span>
               )}
               {currentVibeName && tracks.length > 3 && (
-                <span className="text-sm text-brand/80 italic mt-1.5">{currentVibeName}</span>
+                <span className="text-sm text-brand italic mt-1.5">{currentVibeName}</span>
               )}
             </button>
           ) : (
@@ -424,7 +438,7 @@ export default function PlaylistDetailClient({
                 <p className="text-base text-text-secondary mt-1 max-w-xs">{currentDescription}</p>
               )}
               {currentVibeName && tracks.length > 3 && (
-                <p className="text-sm text-brand/80 italic mt-1.5">{currentVibeName}</p>
+                <p className="text-sm text-brand italic mt-1.5">{currentVibeName}</p>
               )}
             </>
           )}
@@ -479,9 +493,11 @@ export default function PlaylistDetailClient({
               </svg>
               Sync
             </button>
-            <button onClick={() => setShowShare(true)} className="btn-pill-secondary btn-pill-sm">
-              Share
-            </button>
+            {isOwner && (
+              <button onClick={() => setShowShare(true)} className="btn-pill-secondary btn-pill-sm">
+                Invite
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -505,7 +521,7 @@ export default function PlaylistDetailClient({
       {isFollowing === false && (
         <div className="mx-4 mt-4 glass rounded-2xl p-5 text-center">
           <svg
-            className="w-8 h-8 mx-auto mb-2 text-[#1DB954]"
+            className="w-8 h-8 mx-auto mb-2 text-accent-green"
             viewBox="0 0 24 24"
             fill="currentColor"
           >
@@ -520,7 +536,7 @@ export default function PlaylistDetailClient({
           <button
             onClick={handleFollow}
             disabled={followLoading}
-            className="btn-pill text-sm px-6 py-2.5 bg-[#1DB954] text-black hover:bg-[#1ed760] disabled:opacity-50"
+            className="btn-pill text-sm px-6 py-2.5 bg-accent-green text-black hover:bg-accent-green/90 disabled:opacity-50"
           >
             {followLoading ? 'Following...' : 'Follow on Spotify'}
           </button>
@@ -607,15 +623,16 @@ export default function PlaylistDetailClient({
 
       {activeTab === 'outcasts' && <OutcastTracksView outcastTracks={outcastTracks} />}
 
-      {/* Share sheet */}
-      <ShareSheet
-        isOpen={showShare}
-        onClose={() => setShowShare(false)}
-        inviteCode={inviteCode}
-        playlistId={playlistId}
-        playlistName={currentName}
-        circleSpotifyClientId={circleSpotifyClientId}
-      />
+      {/* Share sheet (host only) */}
+      {isOwner && (
+        <ShareSheet
+          isOpen={showShare}
+          onClose={() => setShowShare(false)}
+          circleInviteCode={circleInviteCode}
+          circleName={circleName}
+          circleId={circleId}
+        />
+      )}
 
       {/* Edit details modal */}
       {isOwner && (

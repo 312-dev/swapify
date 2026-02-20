@@ -2,8 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { m } from 'motion/react';
 import { toast } from 'sonner';
 import { subscribeToPush } from '@/lib/push-client';
+import { springs, STAGGER_DELAY } from '@/lib/motion';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_TYPE_LABELS,
@@ -273,38 +275,61 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
     <div className="min-h-screen">
       {/* Header */}
       <div className="gradient-bg-radial px-5 pt-10 pb-8 flex flex-col items-center text-center">
-        {user.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt={user.displayName}
-            className="w-24 h-24 rounded-full mb-4 shadow-xl"
-          />
-        ) : (
-          <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-3xl font-bold text-text-secondary mb-4">
-            {user.displayName[0]}
-          </div>
-        )}
-        <h1 className="text-3xl font-bold text-text-primary">{user.displayName}</h1>
+        <m.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ ...springs.gentle, delay: 0.05 }}
+        >
+          {user.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt={user.displayName}
+              className="w-24 h-24 rounded-full mb-4 shadow-xl glow-brand"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-3xl font-bold text-text-secondary mb-4 glow-brand">
+              {user.displayName[0]}
+            </div>
+          )}
+        </m.div>
+        <m.h1
+          className="text-3xl font-bold text-text-primary"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: 0.1 }}
+        >
+          {user.displayName}
+        </m.h1>
 
         {/* Stats */}
-        <div className="flex items-center gap-6 mt-4">
+        <m.div
+          className="flex items-center gap-6 mt-4"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: 0.15 }}
+        >
           <div className="text-center">
             <p className="text-xl font-bold text-text-primary">{stats.jamCount}</p>
-            <p className="text-sm text-text-tertiary">Swaplists</p>
+            <p className="text-sm text-text-secondary">Swaplists</p>
           </div>
           <div className="w-px h-8 bg-white/10" />
           <div className="text-center">
             <p className="text-xl font-bold text-text-primary">{stats.trackCount}</p>
-            <p className="text-sm text-text-tertiary">Tracks Added</p>
+            <p className="text-sm text-text-secondary">Tracks Added</p>
           </div>
-        </div>
+        </m.div>
       </div>
 
       {/* Settings sections */}
       <div className="px-5 py-6 space-y-4">
         {/* Notification Channels */}
-        <div className="glass rounded-2xl p-5">
-          <h3 className="text-base font-semibold text-text-secondary uppercase tracking-wider mb-4">
+        <m.div
+          className="glass rounded-2xl p-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: STAGGER_DELAY * 8 }}
+        >
+          <h3 className="text-base font-semibold text-text-primary uppercase tracking-wider mb-4">
             Notification Channels
           </h3>
           <div className="space-y-4">
@@ -434,17 +459,22 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
               </div>
             </div>
           </div>
-        </div>
+        </m.div>
 
         {/* Notification Types */}
-        <div className="glass rounded-2xl p-5">
+        <m.div
+          className="glass rounded-2xl p-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: STAGGER_DELAY * 12 }}
+        >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-text-secondary uppercase tracking-wider">
+            <h3 className="text-base font-semibold text-text-primary uppercase tracking-wider">
               Notification Types
             </h3>
             <button
               onClick={handleReset}
-              className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+              className="text-sm text-text-tertiary hover:text-text-secondary transition-colors"
             >
               Reset defaults
             </button>
@@ -452,8 +482,8 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
 
           {/* Column headers */}
           <div className="flex items-center justify-end gap-3 mb-3 pr-0.5">
-            <span className="text-xs text-text-tertiary w-10 text-center">Push</span>
-            <span className="text-xs text-text-tertiary w-10 text-center">Email</span>
+            <span className="text-sm text-text-tertiary w-10 text-center">Push</span>
+            <span className="text-sm text-text-tertiary w-10 text-center">Email</span>
           </div>
 
           <div className="space-y-3">
@@ -463,7 +493,7 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
                   <p className="text-sm font-medium text-text-primary">
                     {NOTIFICATION_TYPE_LABELS[type].label}
                   </p>
-                  <p className="text-xs text-text-tertiary">
+                  <p className="text-sm text-text-tertiary">
                     {NOTIFICATION_TYPE_LABELS[type].description}
                   </p>
                 </div>
@@ -484,11 +514,16 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
               </div>
             ))}
           </div>
-        </div>
+        </m.div>
 
         {/* Listening */}
-        <div className="glass rounded-2xl p-5">
-          <h3 className="text-base font-semibold text-text-secondary uppercase tracking-wider mb-4">
+        <m.div
+          className="glass rounded-2xl p-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.gentle, delay: STAGGER_DELAY * 16 }}
+        >
+          <h3 className="text-base font-semibold text-text-primary uppercase tracking-wider mb-4">
             Listening
           </h3>
           <ToggleRow
@@ -497,19 +532,26 @@ function ProfileContent({ user, stats }: ProfileClientProps) {
             enabled={user.autoNegativeReactions}
             onChange={(v) => updatePreference('autoNegativeReactions', v)}
           />
-        </div>
+        </m.div>
 
         {/* Logout */}
-        <form action="/api/auth/logout" method="POST" className="pt-4">
+        <m.form
+          action="/api/auth/logout"
+          method="POST"
+          className="pt-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ ...springs.gentle, delay: STAGGER_DELAY * 20 }}
+        >
           <button
             type="submit"
             className="btn-pill w-full text-danger border border-danger/30 hover:bg-danger/10 transition-colors"
           >
             Log out
           </button>
-        </form>
+        </m.form>
 
-        <p className="text-center text-sm text-text-tertiary pt-2">
+        <p className="text-center text-sm text-text-secondary pt-2">
           Swapify · Built with Spotify Web API
         </p>
       </div>
@@ -530,6 +572,11 @@ function ToggleRow({
 }) {
   const [isOn, setIsOn] = useState(enabled);
 
+  // Sync with parent state (e.g. when browser permission check overrides pushMaster)
+  useEffect(() => {
+    setIsOn(enabled);
+  }, [enabled]);
+
   async function handleClick() {
     const next = !isOn;
     setIsOn(next);
@@ -546,7 +593,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-4">
       <div className="flex-1 min-w-0">
         <p className="text-base font-medium text-text-primary">{label}</p>
-        <p className="text-sm text-text-tertiary mt-0.5">{description}</p>
+        <p className="text-sm text-text-secondary mt-0.5">{description}</p>
       </div>
       <button
         role="switch"

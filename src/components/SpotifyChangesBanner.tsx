@@ -1,8 +1,53 @@
 'use client';
 
 import { useState } from 'react';
-import { Info, ChevronRight, Check, Minus } from 'lucide-react';
+import {
+  Info,
+  ChevronRight,
+  Check,
+  Minus,
+  Users,
+  ListMusic,
+  Crown,
+  UserPlus,
+  Music,
+} from 'lucide-react';
 import GlassDrawer from '@/components/ui/glass-drawer';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
+const FEATURES = [
+  { label: 'Add', tip: 'Add tracks to the Swaplist' },
+  { label: 'React', tip: 'React to tracks with emoji' },
+  { label: 'Save', tip: 'Save favorites to a personal liked playlist' },
+  { label: 'Auto-listen', tip: "Swapify detects when you've heard a song" },
+  { label: 'Auto-remove', tip: 'Tracks clear out once everyone has listened' },
+  { label: 'Invite', tip: 'Invite new members to the circle' },
+  { label: 'Settings', tip: 'Manage circle and Swaplist settings' },
+] as const;
+
+const ROLES = [
+  {
+    name: 'Host',
+    desc: 'Creates the circle',
+    color: 'text-brand',
+    icon: Crown,
+    features: [true, true, true, true, true, true, true],
+  },
+  {
+    name: 'Member',
+    desc: 'Joins via invite',
+    color: 'text-accent-green',
+    icon: UserPlus,
+    features: [true, true, true, true, true, false, false],
+  },
+  {
+    name: 'Collaborator',
+    desc: 'Not in circle',
+    color: 'text-text-tertiary',
+    icon: Music,
+    features: [true, false, true, false, false, false, false],
+  },
+];
 
 export default function SpotifyChangesBanner() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -13,12 +58,13 @@ export default function SpotifyChangesBanner() {
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           <Info className="w-4 h-4 text-brand shrink-0" />
           <p className="text-sm text-text-secondary flex-1 min-w-0">
-            See what you get with Swapify.{' '}
+            A shared playlist that clears as you listen &mdash; friends drop songs in, you react,
+            and the queue empties itself.{' '}
             <button
               onClick={() => setDrawerOpen(true)}
               className="text-brand hover:text-brand-hover inline-flex items-center gap-0.5 font-medium transition-colors"
             >
-              Compare experiences
+              See how it works
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </p>
@@ -31,176 +77,93 @@ export default function SpotifyChangesBanner() {
         title="How Swapify Works"
         snapPoint="full"
       >
-        <div className="space-y-8">
-          {/* Intro */}
-          <p className="text-base leading-relaxed text-text-secondary">
-            Swapify is a shared music inbox. Everyone gets something different depending on how they
-            connect.
-          </p>
-
-          {/* Feature matrix */}
+        <div className="space-y-6">
+          {/* Circles */}
           <section>
-            <div className="glass rounded-xl overflow-hidden">
-              {/* Column headers */}
-              <div className="grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem] items-end gap-0 border-b border-glass-border px-4 py-3">
-                <span className="text-xs text-text-tertiary uppercase tracking-wider">Feature</span>
-                <span className="text-center text-xs font-semibold text-brand leading-tight">
-                  Host
-                </span>
-                <span className="text-center text-xs font-semibold text-accent-green leading-tight">
-                  Member
-                </span>
-                <span className="text-center text-xs font-semibold text-[#1DB954] leading-tight">
-                  Listener
-                </span>
-              </div>
+            <h3 className="text-xl font-semibold text-text-primary mb-2 flex items-center gap-2.5">
+              <Users className="w-5 h-5 text-brand" />
+              Circles
+            </h3>
+            <p className="text-base text-text-secondary leading-relaxed">
+              A circle is your friend group on Swapify. One person creates a circle, then invites
+              others to join. Everyone in a circle shares Swaplists together and can be in multiple
+              circles for different groups of friends.
+            </p>
+          </section>
 
-              {/* Rows */}
-              {[
-                {
-                  key: 'listen',
-                  feature: 'Listen on Spotify',
-                  host: true,
-                  member: true,
-                  listener: true,
-                },
-                { key: 'add', feature: 'Add tracks', host: true, member: true, listener: false },
-                {
-                  key: 'react',
-                  feature: 'React to tracks',
-                  host: true,
-                  member: true,
-                  listener: false,
-                },
-                {
-                  key: 'liked',
-                  feature: 'Save to Liked',
-                  host: true,
-                  member: true,
-                  listener: false,
-                },
-                {
-                  key: 'tracking',
-                  feature: 'Auto listen tracking',
-                  host: true,
-                  member: true,
-                  listener: false,
-                  tooltip: "Swapify detects when you've heard a song and marks it as listened",
-                },
-                {
-                  key: 'cycling',
-                  feature: 'Smart track cycling',
-                  host: true,
-                  member: true,
-                  listener: false,
-                  tooltip: 'Tracks are removed once everyone has heard them',
-                },
-                {
-                  key: 'settings',
-                  feature: 'Manage settings',
-                  host: true,
-                  member: false,
-                  listener: false,
-                },
-                {
-                  key: 'nosetup',
-                  feature: 'No setup needed',
-                  host: false,
-                  member: false,
-                  listener: true,
-                },
-              ].map((row, i) => (
-                <div
-                  key={row.key}
-                  className={`grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem] items-center gap-0 px-4 py-2.5 ${
-                    i % 2 === 0 ? 'bg-white/2' : ''
-                  }`}
-                >
-                  <span className="text-sm text-text-secondary">
-                    {row.tooltip ? (
-                      <span
-                        className="border-b border-dotted border-text-tertiary cursor-help"
-                        data-tooltip={row.tooltip}
+          {/* Swaplists */}
+          <section>
+            <h3 className="text-xl font-semibold text-text-primary mb-2 flex items-center gap-2.5">
+              <ListMusic className="w-5 h-5 text-accent-green" />
+              Swaplists
+            </h3>
+            <p className="text-base text-text-secondary leading-relaxed">
+              A Swaplist is your group&apos;s musical mailbox. Everyone drops songs in, listens
+              through each other&apos;s picks, and reacts. Once everyone&apos;s heard a track, it
+              clears out automatically &mdash; or after 7 days, whichever comes first.
+            </p>
+          </section>
+
+          {/* Feature matrix — transposed: roles as rows, features as columns */}
+          <section>
+            <p className="text-base text-text-secondary mb-3">
+              Depending on how you join, you&apos;ll have different capabilities:
+            </p>
+            <div className="glass rounded-xl overflow-x-auto">
+              <table className="w-full min-w-105">
+                <thead>
+                  <tr className="border-b border-glass-border">
+                    <th className="text-left px-4 py-3 text-sm text-text-secondary uppercase tracking-wider">
+                      Role
+                    </th>
+                    {FEATURES.map((f) => (
+                      <th
+                        key={f.label}
+                        className="px-2 py-3 text-center text-sm text-text-secondary font-medium whitespace-nowrap"
                       >
-                        {row.feature}
-                      </span>
-                    ) : (
-                      row.feature
-                    )}
-                  </span>
-                  <span className="flex justify-center">
-                    {row.host ? (
-                      <Check className="w-4 h-4 text-brand" />
-                    ) : (
-                      <Minus className="w-4 h-4 text-text-tertiary/40" />
-                    )}
-                  </span>
-                  <span className="flex justify-center">
-                    {row.member ? (
-                      <Check className="w-4 h-4 text-accent-green" />
-                    ) : (
-                      <Minus className="w-4 h-4 text-text-tertiary/40" />
-                    )}
-                  </span>
-                  <span className="flex justify-center">
-                    {row.listener ? (
-                      <Check className="w-4 h-4 text-[#1DB954]" />
-                    ) : (
-                      <Minus className="w-4 h-4 text-text-tertiary/40" />
-                    )}
-                  </span>
-                </div>
-              ))}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="border-b border-dotted border-text-tertiary cursor-help">
+                              {f.label}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={4}>
+                            {f.tip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ROLES.map((role, ri) => (
+                    <tr key={role.name} className={ri % 2 === 0 ? 'bg-white/2' : ''}>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`flex items-center gap-2 text-base font-medium ${role.color}`}
+                        >
+                          <role.icon className="w-4 h-4" />
+                          {role.name}
+                        </span>
+                        <span className="block text-sm text-text-secondary ml-6">{role.desc}</span>
+                      </td>
+                      {role.features.map((has, fi) => (
+                        <td key={FEATURES[fi]?.label} className="px-2 py-3 text-center">
+                          {has ? (
+                            <Check className={`w-4 h-4 ${role.color} inline-block`} />
+                          ) : (
+                            <Minus className="w-4 h-4 text-text-tertiary/30 inline-block" />
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            {/* Capacity note */}
-            <p className="text-xs text-text-tertiary mt-3">
-              Each Swaplist supports 1 host + up to 5 connected members. Unlimited Spotify listeners
-              can follow along.
-            </p>
-          </section>
-
-          {/* How tracks cycle */}
-          <section>
-            <h3 className="text-lg font-semibold text-text-primary mb-2">How tracks cycle out</h3>
-            <p className="text-sm text-text-secondary leading-relaxed mb-3">
-              The playlist refreshes itself. Whichever happens first:
-            </p>
-            <div className="space-y-2">
-              <div className="flex items-start gap-3 text-sm text-text-secondary">
-                <span className="mt-1.5 w-2 h-2 rounded-full bg-accent-green shrink-0" />
-                <span>
-                  <span className="font-medium text-text-primary">Heard by everyone</span> &mdash;
-                  removed once all connected members have listened or reacted
-                </span>
-              </div>
-              <div className="flex items-start gap-3 text-sm text-text-secondary">
-                <span className="mt-1.5 w-2 h-2 rounded-full bg-brand shrink-0" />
-                <span>
-                  <span className="font-medium text-text-primary">Auto-refresh</span> &mdash;
-                  removed after{' '}
-                  <span
-                    className="border-b border-dotted border-text-tertiary cursor-help"
-                    data-tooltip="Hosts can change this or turn it off in settings"
-                  >
-                    7 days
-                  </span>{' '}
-                  regardless, so the playlist never goes stale
-                </span>
-              </div>
-            </div>
-            <p className="text-xs text-text-tertiary mt-2">
-              Both can be adjusted by the host in Swaplist settings.
-            </p>
-          </section>
-
-          {/* Getting started nudge */}
-          <section className="glass rounded-xl p-4">
-            <p className="text-sm text-text-secondary leading-relaxed">
-              <span className="font-medium text-text-primary">Want the best experience?</span> Ask
-              the host to invite you as a connected member so you get reactions, liked history, and
-              automatic listen tracking. Or if you&apos;re starting a group, tap{' '}
-              <span className="font-medium text-brand">Get Started</span> below.
+            <p className="text-sm text-text-secondary mt-3">
+              Collaborators are Spotify users who add to the playlist directly, without joining the
+              circle on Swapify.
             </p>
           </section>
         </div>

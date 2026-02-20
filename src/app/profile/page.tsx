@@ -1,11 +1,11 @@
-import { requireAuth } from '@/lib/auth';
+import { requireVerifiedEmail } from '@/lib/auth';
 import { db } from '@/db';
 import { playlistMembers, playlistTracks } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import ProfileClient from './ProfileClient';
 
 export default async function ProfilePage() {
-  const user = await requireAuth();
+  const user = await requireVerifiedEmail();
 
   // Count user's playlists
   const memberships = await db.query.playlistMembers.findMany({

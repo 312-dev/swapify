@@ -1,11 +1,12 @@
-import { requireAuth, getSession, getUserCircles } from '@/lib/auth';
+import { Suspense } from 'react';
+import { requireVerifiedEmail, getSession, getUserCircles } from '@/lib/auth';
 import { db } from '@/db';
 import { playlistMembers, trackListens, trackReactions } from '@/db/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import DashboardClient from './DashboardClient';
 
 export default async function DashboardPage() {
-  const user = await requireAuth();
+  const user = await requireVerifiedEmail();
   const session = await getSession();
 
   // Pre-fetch circles to auto-default if needed
@@ -90,19 +91,32 @@ export default async function DashboardPage() {
     name: cm.circle.name,
     imageUrl: cm.circle.imageUrl ?? null,
     spotifyClientId: cm.circle.spotifyClientId,
+    inviteCode: cm.circle.inviteCode,
+    maxMembers: cm.circle.maxMembers,
     role: cm.role,
-    memberCount: 0, // Could be enriched with a count query if needed
+    memberCount: cm.circle.members.length,
+    members: cm.circle.members.map((m) => ({
+      id: m.user.id,
+      displayName: m.user.displayName,
+      avatarUrl: m.user.avatarUrl ?? null,
+      role: m.role,
+      joinedAt: m.joinedAt.toISOString(),
+    })),
   }));
 
   return (
-    <DashboardClient
-      playlists={playlists}
-      userName={user.displayName}
-      notifyPush={user.notifyPush}
-      circles={circles}
-      activeCircleId={activeCircleId}
-      activeCircleName={activeCircleName}
-      syncCircleId={needsCircleSync ? activeCircleId : null}
-    />
+    <Suspense>
+      <DashboardClient
+        playlists={playlists}
+        userName={user.displayName}
+        spotifyId={user.spotifyId}
+        notifyPush={user.notifyPush}
+        circles={circles}
+        activeCircleId={activeCircleId}
+        activeCircleName={activeCircleName}
+        syncCircleId={needsCircleSync ? activeCircleId : null}
+        hasCompletedTour={user.hasCompletedTour}
+      />
+    </Suspense>
   );
 }

@@ -4,7 +4,22 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { formatRemovalDelay, type RemovalDelay } from '@/lib/utils';
+import {
+  formatRemovalDelay,
+  type RemovalDelay,
+  SORT_MODE_LABELS,
+  type SortMode,
+} from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function PlaylistSettingsPage() {
   const router = useRouter();
@@ -13,10 +28,11 @@ export default function PlaylistSettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [maxTracksPerUser, setMaxTracksPerUser] = useState('');
   const [maxTrackAgeDays, setMaxTrackAgeDays] = useState(7);
   const [removalDelay, setRemovalDelay] = useState('immediate');
+  const [sortMode, setSortMode] = useState<SortMode>('order_added');
 
   // Load current playlist data
   useEffect(() => {
@@ -26,6 +42,7 @@ export default function PlaylistSettingsPage() {
         setMaxTracksPerUser(data.maxTracksPerUser?.toString() || '');
         setMaxTrackAgeDays(data.maxTrackAgeDays ?? 7);
         setRemovalDelay(data.removalDelay || 'immediate');
+        setSortMode(data.sortMode || 'order_added');
       });
   }, [playlistId]);
 
@@ -39,6 +56,7 @@ export default function PlaylistSettingsPage() {
           maxTracksPerUser.trim() === '' ? null : Number.parseInt(maxTracksPerUser, 10),
         maxTrackAgeDays,
         removalDelay,
+        sortMode,
       };
 
       const res = await fetch(`/api/playlists/${playlistId}`, {
@@ -61,11 +79,6 @@ export default function PlaylistSettingsPage() {
   }
 
   async function handleDelete() {
-    if (!showDeleteConfirm) {
-      setShowDeleteConfirm(true);
-      return;
-    }
-
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' });
@@ -75,12 +88,12 @@ export default function PlaylistSettingsPage() {
         const data = await res.json();
         toast.error(data.error || 'Failed to delete');
         setIsDeleting(false);
-        setShowDeleteConfirm(false);
+        setShowDeleteDialog(false);
       }
     } catch {
       toast.error('Failed to delete');
       setIsDeleting(false);
-      setShowDeleteConfirm(false);
+      setShowDeleteDialog(false);
     }
   }
 
@@ -128,6 +141,44 @@ export default function PlaylistSettingsPage() {
             <p className="text-sm text-text-tertiary mt-1.5">
               Limit how many active tracks each member can have. Leave blank for unlimited.
             </p>
+          </div>
+
+          {/* Track ordering */}
+          <div className="glass rounded-xl p-5 mt-4">
+            <h2 className="text-base font-medium text-text-secondary mb-1">Track ordering</h2>
+            <p className="text-sm text-text-tertiary mb-3">
+              Choose how tracks are ordered in this Swaplist.
+            </p>
+            <label
+              htmlFor="sortMode"
+              className="block text-base font-medium text-text-secondary mb-2"
+            >
+              Sort mode
+            </label>
+            <select
+              id="sortMode"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="input-glass w-full"
+            >
+              {(Object.entries(SORT_MODE_LABELS) as [SortMode, string][]).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {sortMode === 'round_robin' && (
+              <p className="text-sm text-text-tertiary mt-2">
+                Alternates tracks between contributors for equal play time, ordered by when each
+                person first added a track.
+              </p>
+            )}
+            {(sortMode === 'energy_desc' || sortMode === 'energy_asc') && (
+              <p className="text-sm text-text-tertiary mt-2">
+                Sorts tracks by energy level using audio analysis. This may take a moment for large
+                playlists.
+              </p>
+            )}
           </div>
 
           {/* Auto-refresh timer */}
@@ -214,32 +265,32 @@ export default function PlaylistSettingsPage() {
         {/* Danger zone */}
         <div className="glass rounded-xl p-5 mt-8 border border-danger/20">
           <h2 className="text-base font-medium text-danger mb-2">Danger zone</h2>
-          {showDeleteConfirm && (
-            <p className="text-sm text-text-secondary mb-3">Are you sure? This cannot be undone.</p>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="btn-pill text-danger border border-danger/30 hover:bg-danger/10 disabled:opacity-50"
-            >
-              {isDeleting
-                ? 'Deleting...'
-                : showDeleteConfirm
-                  ? 'Yes, delete'
-                  : 'Delete this Swaplist'}
-            </button>
-            {showDeleteConfirm && (
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="btn-pill btn-pill-secondary"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
+          <button
+            onClick={() => setShowDeleteDialog(true)}
+            className="btn-pill text-danger border border-danger/30 hover:bg-danger/10"
+          >
+            Delete this Swaplist
+          </button>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="!bg-[#1a1a1a] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this Swaplist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the Swaplist and remove all tracks. This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

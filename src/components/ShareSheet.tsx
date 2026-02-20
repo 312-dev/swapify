@@ -6,19 +6,17 @@ import GlassDrawer from '@/components/ui/glass-drawer';
 interface ShareSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  inviteCode: string;
-  playlistId: string;
-  playlistName: string;
-  circleSpotifyClientId?: string;
+  circleInviteCode: string;
+  circleName: string;
+  circleId: string;
 }
 
 export default function ShareSheet({
   isOpen,
   onClose,
-  inviteCode,
-  playlistId,
-  playlistName,
-  circleSpotifyClientId,
+  circleInviteCode,
+  circleName,
+  circleId,
 }: ShareSheetProps) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -31,11 +29,11 @@ export default function ShareSheet({
 
   const inviteUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/playlist/join?code=${inviteCode}${circleSpotifyClientId ? `&cid=${circleSpotifyClientId}` : ''}`
+      ? `${window.location.origin}/circle/join?code=${circleInviteCode}`
       : '';
 
   function handleCopyCode() {
-    navigator.clipboard.writeText(inviteCode);
+    navigator.clipboard.writeText(circleInviteCode);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2000);
   }
@@ -49,8 +47,8 @@ export default function ShareSheet({
   async function handleNativeShare() {
     try {
       await navigator.share({
-        title: `Join "${playlistName}" on Swapify`,
-        text: `Join my Swaplist! Use code: ${inviteCode}`,
+        title: `Join "${circleName}" on Swapify`,
+        text: `Join my circle on Swapify! Use code: ${circleInviteCode}`,
         url: inviteUrl,
       });
     } catch {
@@ -67,7 +65,7 @@ export default function ShareSheet({
     setEmailStatus(null);
 
     try {
-      const res = await fetch(`/api/playlists/${playlistId}/invite`, {
+      const res = await fetch(`/api/circles/${circleId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
@@ -105,7 +103,7 @@ export default function ShareSheet({
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   return (
-    <GlassDrawer isOpen={isOpen} onClose={handleClose} title="Invite Friends" snapPoint="half">
+    <GlassDrawer isOpen={isOpen} onClose={handleClose} title="Invite to Circle" snapPoint="half">
       <div className="space-y-5">
         {/* Invite code — front and center */}
         <div>
@@ -117,7 +115,7 @@ export default function ShareSheet({
             className="w-full glass rounded-xl p-4 flex items-center justify-between gap-3 active:scale-[0.98] transition-transform"
           >
             <span className="text-2xl font-mono font-bold tracking-widest text-text-primary select-all">
-              {inviteCode}
+              {circleInviteCode}
             </span>
             <span className="shrink-0 text-sm text-text-secondary">
               {codeCopied ? (
@@ -135,8 +133,8 @@ export default function ShareSheet({
               )}
             </span>
           </button>
-          <p className="text-xs text-text-tertiary mt-1.5">
-            Share this code so friends can join from the dashboard
+          <p className="text-sm text-text-tertiary mt-1.5">
+            Share this code so friends can join your circle
           </p>
         </div>
 
@@ -166,7 +164,7 @@ export default function ShareSheet({
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-white/10" />
-          <span className="text-xs text-text-tertiary">or share via link / email</span>
+          <span className="text-sm text-text-tertiary">or share via link / email</span>
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
@@ -224,7 +222,7 @@ export default function ShareSheet({
           </div>
           {emailStatus && (
             <p
-              className={`text-xs mt-2 ${
+              className={`text-sm mt-2 ${
                 emailStatus.type === 'success' ? 'text-brand' : 'text-red-400'
               }`}
             >

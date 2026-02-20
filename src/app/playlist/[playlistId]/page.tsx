@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { requireAuth } from '@/lib/auth';
+import { requireVerifiedEmail } from '@/lib/auth';
 import { db } from '@/db';
 import { playlists, playlistMembers } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -11,7 +11,7 @@ export default async function PlaylistDetailPage({
 }: {
   params: Promise<{ playlistId: string }>;
 }) {
-  const user = await requireAuth();
+  const user = await requireVerifiedEmail();
   const { playlistId } = await params;
 
   const membership = await db.query.playlistMembers.findFirst({
@@ -32,13 +32,15 @@ export default async function PlaylistDetailPage({
         playlistName={playlist.name}
         playlistDescription={playlist.description}
         playlistImageUrl={playlist.imageUrl}
-        inviteCode={playlist.inviteCode}
         isOwner={playlist.ownerId === user.id}
         ownerId={playlist.ownerId}
         currentUserId={user.id}
         spotifyPlaylistId={playlist.spotifyPlaylistId}
         vibeName={playlist.vibeName}
-        circleSpotifyClientId={playlist.circle.spotifyClientId}
+        circleInviteCode={playlist.circle.inviteCode}
+        circleName={playlist.circle.name}
+        circleId={playlist.circle.id}
+        spotifyClientId={playlist.circle.spotifyClientId}
       />
     </Suspense>
   );
